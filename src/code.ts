@@ -15,21 +15,10 @@ import {
 import { snapshotTree, snapshotNormalizedContext } from './structure/snapshot';
 import { DiffEntry, diffStructures } from './structure/diff';
 import type { DSStructureNode } from './types/structures';
-import type {
-  AuditItem,
-  DetachedEntry,
-  RelevanceStatus,
-  ThemeStatus,
-} from './types/audit';
+import type { AuditItem, RelevanceStatus, ThemeStatus } from './types/audit';
 import { tabDefinitions } from './config/tabs';
 import { eyeClosedIcon, eyeOpenIcon } from './icons';
-import {
-  buildNodePath,
-  clampColorComponent,
-  extractAliasKey,
-  getPageName,
-  isNodeVisible,
-} from './utils/nodeHelpers';
+import { buildNodePath, clampColorComponent, extractAliasKey, getPageName } from './utils/nodeHelpers';
 import {
   collectCustomStyleEntries,
   collectDetachedEntries,
@@ -111,6 +100,10 @@ const YANDEX_MODEL = 'gpt-4o-mini';
  * Запускает полный аудит выделенной сцены: загружает каталоги, делает снимок,
  * сравнивает со справочником и обрабатывает результат для UI.
  * Функция отслеживает отмену, показывает уведомления и пишет логи по времени.
+ */
+/**
+ * Запускает полный аудит текущего выделения: проверяет готовность справочников,
+ * снимает snapshоты, классифицирует узлы и формирует структуры для табов UI.
  */
 async function runAudit() {
   if (scanInProgress) {
@@ -339,6 +332,9 @@ async function runAudit() {
   }
 }
 
+/**
+ * Preload запускается один раз и подготавливает UI, пока каталоги подгружаются в фоне.
+ */
 function startCatalogPreload() {
   if (catalogPreloadStarted) return;
   catalogPreloadStarted = true;
@@ -356,6 +352,10 @@ function startCatalogPreload() {
     });
 }
 
+/**
+ * Рекурсивно собирает все компоненты и инстансы внутри выделения (кроме обычных фреймов),
+ * чтобы мы могли прогнать их по справочнику.
+ */
 function collectTargets(selection: readonly SceneNode[]): SceneNode[] {
   const result: SceneNode[] = [];
   const visit = (node: SceneNode) => {
@@ -380,6 +380,10 @@ function collectTargets(selection: readonly SceneNode[]): SceneNode[] {
 /**
  * Приводит SceneNode к `AuditItem`: ищет компонент в каталогах, делает снапшот,
  * сравнивает структуру и собирает diff-последствия, статус темы и причины кастомизации.
+ */
+/**
+ * Приводит SceneNode к AuditItem: ищет компонент, подготавливает referenceStructure,
+ * снимает snapshot, делает diff и собирает диагностические метаданные.
  */
 async function classifyNode(
   node: SceneNode,
@@ -413,14 +417,18 @@ async function classifyNode(
     }
   }
   const needsDiff = Boolean(referenceStructure);
+  const instanceHasOverrides =
+    node.type === 'INSTANCE' && hasInstanceOverrides(node as InstanceNode);
+  const shouldDiff =
+    needsDiff && (ref?.status !== 'current' || instanceHasOverrides);
   const actualStructure =
-    needsDiff && referenceStructure ? await snapshotTree(node) : null;
+    shouldDiff && referenceStructure ? await snapshotTree(node) : null;
   const alignedActualStructure =
     referenceStructure && actualStructure
       ? alignStructurePaths(actualStructure, referenceStructure)
       : actualStructure;
   const diffResult =
-    needsDiff && referenceStructure && alignedActualStructure
+    shouldDiff && referenceStructure && alignedActualStructure
       ? diffStructures(alignedActualStructure, referenceStructure, {
           strict: STRICT_COMPARISON,
           resolveTokenLabel: resolveTokenLabelForDiff,
@@ -514,6 +522,15 @@ async function getInstanceMainComponentKey(
     return main?.key ?? null;
   }
   return inst.mainComponent?.key ?? null;
+}
+
+/**
+ * Проверяет, содержит ли инстанс конкретные переопределения, чтобы
+ * не делать diff для чистых текущих компонентов при strict-видимости.
+ */
+function hasInstanceOverrides(instance: InstanceNode): boolean {
+  const overrides = instance.overrides;
+  return Array.isArray(overrides) && overrides.length > 0;
 }
 
 async function focusNode(nodeId: string | undefined) {
@@ -716,6 +733,10 @@ function replacePathPrefix(path: string, from: string, to: string): string {
   return path;
 }
 
+/**
+ * Строит ассоциативные карты для токенов и цветов по всем загруженным токен-каталогам
+ * и сохраняет их в память, чтобы позже подставлять читаемые названия и библиотеку.
+ */
 async function ensureTokenLabelMapLoaded(): Promise<void> {
   if (tokenLabelMap) return;
   if (tokenLabelLoadPromise) {
@@ -775,6 +796,10 @@ async function ensureTokenLabelMapLoaded(): Promise<void> {
   return tokenLabelLoadPromise;
 }
 
+/**
+ * Подготавливает карту стилей, привязанную к их библиотекам и группам,
+ * для доступного отображения ссылок на стили при сравнении.
+ */
 async function ensureStyleLabelMapLoaded(): Promise<void> {
   if (styleLabelMap) return;
   if (styleLabelLoadPromise) {

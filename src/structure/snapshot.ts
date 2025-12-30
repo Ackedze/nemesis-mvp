@@ -11,10 +11,21 @@ import type {
   DSNormalizedElement,
 } from '../types/structures';
 
+/**
+ * Возвращает флаг видимости узла без учёта родителей (наследование обрабатывает walk).
+ */
+function getNodeSelfVisible(node: SceneNode): boolean {
+  return 'visible' in node ? (node as any).visible !== false : true;
+}
+
 function makePath(parent: string, name: string): string {
   return parent ? `${parent} / ${name}` : name;
 }
 
+/**
+ * Рекурсивно перебирает дерево узла и формирует плоский список DSStructureNode
+ * с корректным учётом effective visibility, layout, fill/stroke и прочих метаданных.
+ */
 export async function snapshotTree(root: SceneNode): Promise<DSStructureNode[]> {
   const list: DSStructureNode[] = [];
   let nextId = 1;
@@ -23,25 +34,40 @@ export async function snapshotTree(root: SceneNode): Promise<DSStructureNode[]> 
     node: SceneNode,
     parentPath: string,
     parentId: number | null,
+    parentVisible: boolean,
   ) {
     const id = nextId++;
-    const snap = await snapshotNode(node, parentPath, parentId, id);
+    const nodeVisible = getNodeSelfVisible(node);
+    const effectiveVisible = parentVisible && nodeVisible;
+    const snap = await snapshotNode(
+      node,
+      parentPath,
+      parentId,
+      id,
+      effectiveVisible,
+    );
     list.push(snap);
 
     if ('children' in node) {
       const children = node.children as SceneNode[];
       if (children.length) {
         await Promise.all(
-          children.map((child) => walk(child, snap.path, id)),
+          children.map((child) =>
+            walk(child, snap.path, id, snap.visible !== false),
+          ),
         );
       }
     }
   }
 
-  await walk(root, '', null);
+  await walk(root, '', null, true);
   return list;
 }
 
+/**
+ * Собирает flatten-представление контекста (normalized snapshot) для отправки UI,
+ * включая fills/strokes/token/... и отметку видимости во всей ветке.
+ */
 export async function snapshotNormalizedContext(
   root: SceneNode,
 ): Promise<DSNormalizedSnapshot> {
@@ -51,6 +77,7 @@ export async function snapshotNormalizedContext(
     node: SceneNode,
     parentPath: string,
     activeComponentKey: string | null,
+    parentVisible: boolean,
   ) {
     let nextComponentKey = activeComponentKey;
     if (node.type === 'INSTANCE') {
@@ -70,10 +97,12 @@ export async function snapshotNormalizedContext(
     }
 
     const path = makePath(parentPath, node.name);
+    const nodeVisible = getNodeSelfVisible(node);
+    const effectiveVisible = parentVisible && nodeVisible;
     const element: DSNormalizedElement = {
       path,
       type: node.type,
-      visible: 'visible' in node ? (node as any).visible !== false : true,
+      visible: effectiveVisible,
     };
 
     const fillInfo = extractFillInfo(node);
@@ -109,12 +138,12 @@ export async function snapshotNormalizedContext(
     if ('children' in node) {
       const children = node.children as SceneNode[];
       for (const child of children) {
-        await walk(child, path, nextComponentKey);
+        await walk(child, path, nextComponentKey, effectiveVisible);
       }
     }
   }
 
-  await walk(root, '', null);
+  await walk(root, '', null, true);
   return {
     kind: 'snapshot',
     source: {
@@ -127,11 +156,15 @@ export async function snapshotNormalizedContext(
   };
 }
 
+/**
+ * Базовый снимок одного узла: собирает layout, paint, radius, эффекты и связанную компоненту.
+ */
 async function snapshotNode(
   node: SceneNode,
   parentPath: string,
   parentId: number | null,
   id: number,
+  visible: boolean,
 ): Promise<DSStructureNode> {
   const path = makePath(parentPath, node.name);
   const snap: DSStructureNode = {
@@ -141,7 +174,7 @@ async function snapshotNode(
     path,
     type: node.type,
     name: node.name,
-    visible: 'visible' in node ? (node as any).visible !== false : true,
+    visible,
   };
 
   const styles = extractStyles(node);

@@ -27,6 +27,9 @@ export interface CustomStyleCollectionOptions {
   tokenLabelMap: Map<string, { label: string; library?: string }>;
 }
 
+/**
+ * Собирает все узлы, у которых явно навешаны кастомные стили (заливка/обводка/текст) вне компонентных диффов.
+ */
 export function collectCustomStyleEntries(
   selection: readonly SceneNode[],
   options: CustomStyleCollectionOptions,
@@ -61,6 +64,9 @@ export function collectCustomStyleEntries(
   return entries;
 }
 
+/**
+ * Выбирает все текстовые узлы в выделении и описывает их с точки зрения токенов/стилей.
+ */
 export function collectTextNodesFromSelection(
   selection: readonly SceneNode[],
   options: TextNodeCollectionOptions,
@@ -82,6 +88,10 @@ export function collectTextNodesFromSelection(
   return nodes.map((node) => describeTextNode(node, options));
 }
 
+/**
+ * Находит detachd (освобождённые) frames/groups, которые раньше привязаны к библиотеке,
+ * чтобы показать их в отдельном табе.
+ */
 export function collectDetachedEntries(
   selection: readonly SceneNode[],
 ): DetachedEntry[] {
@@ -133,7 +143,10 @@ export function filterVisibleEntries<T extends { visible?: boolean } & {
   return items.filter((item) => isEntryVisible(item));
 }
 
-function isEntryVisible(item: { visible?: boolean; pathSegments?: PathSegment[] }) {
+/**
+ * Проверяет, виден ли узел с учётом всей иерархии пути (используется и в tab-фильтрах).
+ */
+export function isEntryVisible(item: { visible?: boolean; pathSegments?: PathSegment[] }) {
   if (!item) return false;
   if (item.visible === false) return false;
   const segments = item.pathSegments;
@@ -151,6 +164,10 @@ function isEntryVisible(item: { visible?: boolean; pathSegments?: PathSegment[] 
 }
 
 
+/**
+ * Убирает технические diff-строки и (при необходимости) скрытые узлы,
+ * чтобы таб «Кастомизация» показывал только информативные изменения.
+ */
 export function prepareChangeDiffs(
   diffs: DiffEntry[],
   options: { visibleOnly: boolean },
@@ -162,6 +179,10 @@ export function prepareChangeDiffs(
   return dedupeDiffs(visibleDiffs);
 }
 
+/**
+ * Определяет список инстансов, у которых остаются meaningful diff-ы;
+ * принимает флаг visibleOnly для синхронизации с UI-фильтром.
+ */
 export function computeChangesResults(
   items: AuditItem[],
   options: { visibleOnly: boolean },
@@ -169,6 +190,9 @@ export function computeChangesResults(
   const instanceItems = items.filter((item) => item.nodeType === 'INSTANCE');
   return instanceItems.filter((item) => {
     if (item.themeStatus === 'error') {
+      return false;
+    }
+    if (options.visibleOnly && !isEntryVisible(item)) {
       return false;
     }
     const diffs = prepareChangeDiffs(item.diffs ?? [], options);

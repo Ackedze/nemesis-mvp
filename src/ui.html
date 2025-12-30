@@ -589,6 +589,10 @@
           return current;
         }
 
+        /**
+         * Выбирает основное значение (visible vs raw) для текущего фильтра,
+         * чтобы UI не дублировал логику фильтрации видимости.
+         */
         function resolveViewArray(path) {
           const primary = filters.visibleOnly
             ? currentVisibleViews ?? currentResults?.visibleViews
@@ -699,6 +703,9 @@
         initGptControls();
 
         /* ========== Инициализация фильтров и событий ======= */
+        /**
+         * Инициализирует UI-фильтры и заставляет список перерисовываться и обновлять бейджи.
+         */
         function initFilterControls() {
           if (filterVisibleEl instanceof HTMLInputElement) {
             filters.visibleOnly = filterVisibleEl.checked;
