@@ -76,6 +76,16 @@ export async function snapshotNormalizedContext(
       visible: 'visible' in node ? (node as any).visible !== false : true,
     };
 
+    const fillInfo = extractFillInfo(node);
+    if (fillInfo) {
+      element.fill = fillInfo;
+    }
+
+    const strokeInfo = extractStrokeInfo(node);
+    if (strokeInfo) {
+      element.stroke = strokeInfo;
+    }
+
     if (nextComponentKey) {
       element.componentKey = nextComponentKey;
     }

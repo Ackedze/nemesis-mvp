@@ -119,6 +119,8 @@ export interface DSNormalizedElement {
     styleKey?: string | null;
     token?: string | null;
   };
+  fill?: DSPaintInfo | null;
+  stroke?: DSStrokeInfo | null;
 }
 
 export interface DSNormalizedSnapshot {
