@@ -7,7 +7,7 @@ const referenceListPath = path.resolve(
 );
 const outputPath = path.resolve(
   __dirname,
-  '../../JSONS-MVP/referenceSourcesMVP.json',
+  '../JSONS-MVP/referenceSourcesMVP.json',
 );
 
 if (!fs.existsSync(outputPath)) {
