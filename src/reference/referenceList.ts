@@ -16,7 +16,7 @@ export type RemoteReferenceCatalogList = {
 };
 
 export const referenceCatalogListUrl =
-  'https://ackedze.github.io/nemesis/JSONS-MVP/referenceSourcesMVP.json';
+  'https://ackedze.github.io/nemesis-mvp/JSONS-MVP/referenceSourcesMVP.json';
 
 export function buildReferenceCatalogSources(
   payload: RemoteReferenceCatalogList,

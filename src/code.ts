@@ -5,16 +5,13 @@ import {
   ensureReferenceCatalogsLoaded,
   findComponentByKeyOrName,
   getCorporateCounterpart,
+  getStyleCatalogs,
+  getTokenCatalogs,
   LibraryComponent,
   primaryCatalog,
   reportMissingReference,
   resolveStructure,
 } from './reference/library';
-import {
-  buildReferenceCatalogSources,
-  referenceCatalogListUrl,
-} from './reference/referenceList';
-import { fetchDirect } from './utils/networkFetch';
 import { snapshotTree, snapshotNormalizedContext } from './structure/snapshot';
 import { DiffEntry, diffStructures } from './structure/diff';
 import type { DSStructureNode } from './types/structures';
@@ -726,52 +723,43 @@ async function ensureTokenLabelMapLoaded(): Promise<void> {
   }
   tokenLabelLoadPromise = (async () => {
     try {
-      const response = await fetchReferenceData(referenceCatalogListUrl);
-      const payload = JSON.parse(response);
-      const sources = buildReferenceCatalogSources(payload).filter((source) =>
-        /\/tokens\//i.test(source.url),
-      );
+      await ensureReferenceCatalogsLoaded();
+      const catalogs = getTokenCatalogs();
       const map = new Map<string, { label: string; library?: string }>();
       const colorMap = new Map<string, { label: string; library?: string }>();
-      for (const source of sources) {
-        try {
-          const raw = await fetchReferenceData(source.url);
-          const data = JSON.parse(raw);
-          const collections = data.collections ?? [];
-          for (const collection of collections) {
-            const collectionName = collection.name ?? source.fileName ?? '';
-            const defaultModeId = collection.defaultModeId ?? null;
-            const variables = collection.variables ?? [];
-            for (const variable of variables) {
-              if (!variable.key) continue;
-              const label = buildTokenLabel(
-                collectionName,
-                variable.groupName ?? 'Без группы',
-                variable.tokenName ?? variable.name ?? '',
+      for (const catalog of catalogs) {
+        const catalogLibrary =
+          catalog.meta?.library ?? catalog.meta?.fileName ?? '';
+        const collections = catalog.collections ?? [];
+        for (const collection of collections) {
+          if (!collection) continue;
+          const collectionName =
+            collection.name ?? catalogLibrary ?? catalog.meta?.fileName ?? '';
+          const defaultModeId = collection.defaultModeId ?? null;
+          const variables = collection.variables ?? [];
+          for (const variable of variables) {
+            if (!variable || !variable.key) continue;
+            const label = buildTokenLabel(
+              collectionName,
+              variable.groupName ?? 'Без группы',
+              variable.tokenName ?? variable.name ?? '',
+            );
+            map.set(variable.key, {
+              label,
+              library: collectionName || catalogLibrary,
+            });
+            if (defaultModeId && variable.valuesByMode) {
+              const rgba = toRgbaStringFromToken(
+                variable.valuesByMode[defaultModeId],
               );
-              map.set(variable.key, {
-                label,
-                library: collectionName || source.fileName,
-              });
-              if (defaultModeId && variable.valuesByMode) {
-                const rgba = toRgbaStringFromToken(
-                  (variable.valuesByMode as any)[defaultModeId],
-                );
-                if (rgba && !colorMap.has(rgba)) {
-                  colorMap.set(rgba, {
-                    label,
-                    library: collectionName || source.fileName,
-                  });
-                }
+              if (rgba && !colorMap.has(rgba)) {
+                colorMap.set(rgba, {
+                  label,
+                  library: collectionName || catalogLibrary,
+                });
               }
             }
           }
-        } catch (error) {
-          console.warn(
-            '[Nemesis] failed to load token catalog',
-            source.url,
-            error,
-          );
         }
       }
       tokenLabelMap = map;
@@ -794,34 +782,21 @@ async function ensureStyleLabelMapLoaded(): Promise<void> {
   }
   styleLabelLoadPromise = (async () => {
     try {
-      const response = await fetchReferenceData(referenceCatalogListUrl);
-      const payload = JSON.parse(response);
-      const sources = buildReferenceCatalogSources(payload).filter((source) =>
-        /\/styles\//i.test(source.url),
-      );
+      await ensureReferenceCatalogsLoaded();
+      const catalogs = getStyleCatalogs();
       const map = new Map<string, { label: string; library?: string }>();
-      for (const source of sources) {
-        try {
-          const raw = await fetchReferenceData(source.url);
-          const data = JSON.parse(raw);
-          const styles = data.styles ?? [];
-          const libraryName =
-            data.meta?.library || data.meta?.fileName || source.fileName;
-          for (const style of styles) {
-            if (!style?.key) continue;
-            const label = buildStyleLabel(
-              libraryName || '',
-              style.group ?? '',
-              style.name ?? '',
-            );
-            map.set(style.key, { label, library: libraryName || undefined });
-          }
-        } catch (error) {
-          console.warn(
-            '[Nemesis] failed to load style catalog',
-            source.url,
-            error,
+      for (const catalog of catalogs) {
+        const libraryName =
+          catalog.meta?.library || catalog.meta?.fileName || '';
+        const styles = catalog.styles ?? [];
+        for (const style of styles) {
+          if (!style?.key) continue;
+          const label = buildStyleLabel(
+            libraryName || '',
+            style.group ?? '',
+            style.name ?? '',
           );
+          map.set(style.key, { label, library: libraryName || undefined });
         }
       }
       styleLabelMap = map;
@@ -940,10 +915,6 @@ function getTokenAliasInfo(paint: SolidPaint) {
 function toHex(component: number): string {
   const hex = component.toString(16).toUpperCase();
   return hex.length === 1 ? '0' + hex : hex;
-}
-
-async function fetchReferenceData(url: string): Promise<string> {
-  return fetchDirect(url);
 }
 
 async function handleGptRequest(payload?: GptRequestPayload) {

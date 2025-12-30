@@ -21,6 +21,8 @@ import type {
 } from '../types/structures';
 
 let catalogs: AthenaCatalog[] = [];
+const tokenCatalogs: TokenCatalog[] = [];
+const styleCatalogs: StyleCatalog[] = [];
 const partHostMap = new Map<string, Set<string>>();
 const corporateNameIndex = new Map<string, LibraryComponent>();
 let catalogSources: ReferenceCatalogSource[] | null = null;
@@ -56,6 +58,8 @@ async function loadAllCatalogs(): Promise<void> {
   );
   const modules = await Promise.all(componentSources.map(fetchCatalogModule));
   hydrateCatalogs(modules);
+  await loadTokenCatalogs(sources.filter(isTokenCatalogSource));
+  await loadStyleCatalogs(sources.filter(isStyleCatalogSource));
   catalogLoadState.ready = true;
 }
 
@@ -138,6 +142,66 @@ function parseCatalogPayload(raw: string, fileName: string): AthenaCatalog {
   return parsed;
 }
 
+async function loadTokenCatalogs(sources: ReferenceCatalogSource[]): Promise<void> {
+  tokenCatalogs.length = 0;
+  for (const source of sources) {
+    try {
+      const raw = await requestCatalogSource(source.url);
+      console.log('[Nemesis] token catalog fetched', {
+        fileName: source.fileName,
+        url: source.url,
+        bytes: raw.length,
+      });
+      reportCatalogLoaded(source.fileName, raw.length);
+      const data = JSON.parse(raw);
+      tokenCatalogs.push({
+        meta: data.meta,
+        collections: Array.isArray(data.collections) ? data.collections : [],
+      });
+    } catch (error) {
+      const message =
+        error && typeof error === 'object' && 'message' in error
+          ? String((error as any).message)
+          : String(error ?? 'Unknown error');
+      logCatalogEvent(source, `failed: ${message}`);
+    }
+  }
+}
+
+async function loadStyleCatalogs(sources: ReferenceCatalogSource[]): Promise<void> {
+  styleCatalogs.length = 0;
+  for (const source of sources) {
+    try {
+      const raw = await requestCatalogSource(source.url);
+      console.log('[Nemesis] style catalog fetched', {
+        fileName: source.fileName,
+        url: source.url,
+        bytes: raw.length,
+      });
+      reportCatalogLoaded(source.fileName, raw.length);
+      const data = JSON.parse(raw);
+      styleCatalogs.push({
+        meta: data.meta,
+        styles: Array.isArray(data.styles) ? data.styles : [],
+      });
+    } catch (error) {
+      const message =
+        error && typeof error === 'object' && 'message' in error
+          ? String((error as any).message)
+          : String(error ?? 'Unknown error');
+      logCatalogEvent(source, `failed: ${message}`);
+    }
+  }
+}
+
+export function getTokenCatalogs(): TokenCatalog[] {
+  return tokenCatalogs.slice();
+}
+
+export function getStyleCatalogs(): StyleCatalog[] {
+  return styleCatalogs.slice();
+}
+
 type NormalizedElement = {
   id?: number;
   path: string;
@@ -184,6 +248,31 @@ type NormalizedJsonCatalog = {
   };
   elements?: NormalizedElement[];
   components?: NormalizedJsonComponent[];
+};
+
+type TokenCatalog = {
+  meta?: { fileName?: string; library?: string };
+  collections?: Array<{
+    id?: string;
+    name?: string;
+    defaultModeId?: string | null;
+    variables?: Array<{
+      key?: string;
+      name?: string;
+      tokenName?: string;
+      groupName?: string;
+      valuesByMode?: Record<string, any>;
+    }>;
+  } | null>;
+};
+
+type StyleCatalog = {
+  meta?: { fileName?: string; library?: string };
+  styles?: Array<{
+    key?: string;
+    name?: string;
+    group?: string;
+  } | null>;
 };
 
 type NormalizedJsonComponent = {
