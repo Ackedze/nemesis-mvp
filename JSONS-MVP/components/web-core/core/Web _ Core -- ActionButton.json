@@ -3,7 +3,7 @@
   "source": {
     "library": "Web :: Core",
     "file": "Web :: Core",
-    "generatedAt": "2025-12-26T12:47:03.175Z",
+    "generatedAt": "2025-12-30T07:05:03.022Z",
     "exportVersion": "0.1.0",
     "scope": "current-page",
     "files": [
@@ -35,6 +35,21 @@
             "op": "update",
             "id": 2,
             "value": {
+              "fills": [
+                {
+                  "type": "SOLID",
+                  "color": {
+                    "r": 33,
+                    "g": 33,
+                    "b": 36,
+                    "a": 1
+                  },
+                  "visible": true,
+                  "opacity": 1,
+                  "tokenKey": "VariableID:d5317ee30cdf40e8d5f8e3a8f7d05bb1834e95cd/1930:22",
+                  "colorHex": "#212124"
+                }
+              ],
               "fillToken": "VariableID:d5317ee30cdf40e8d5f8e3a8f7d05bb1834e95cd/1930:22"
             }
           },
@@ -42,6 +57,21 @@
             "op": "update",
             "id": 4,
             "value": {
+              "fills": [
+                {
+                  "type": "SOLID",
+                  "color": {
+                    "r": 255,
+                    "g": 255,
+                    "b": 255,
+                    "a": 0.94
+                  },
+                  "visible": true,
+                  "opacity": 0.9399999976158142,
+                  "tokenKey": "VariableID:3ae8a4cacc6e560441bd23207c4bf16316c166e0/1930:44",
+                  "colorHex": "#FFFFFF"
+                }
+              ],
               "fillToken": "VariableID:3ae8a4cacc6e560441bd23207c4bf16316c166e0/1930:44"
             }
           },
@@ -49,6 +79,21 @@
             "op": "update",
             "id": 7,
             "value": {
+              "fills": [
+                {
+                  "type": "SOLID",
+                  "color": {
+                    "r": 3,
+                    "g": 3,
+                    "b": 6,
+                    "a": 0.88
+                  },
+                  "visible": true,
+                  "opacity": 0.8799999952316284,
+                  "tokenKey": "VariableID:35ea1ba98cfbbc081b766a140740e82ab3e01c92/1930:77",
+                  "colorHex": "#030306"
+                }
+              ],
               "fillToken": "VariableID:35ea1ba98cfbbc081b766a140740e82ab3e01c92/1930:77"
             }
           }
@@ -75,7 +120,9 @@
                     "a": 1
                   },
                   "visible": true,
-                  "opacity": 1
+                  "opacity": 1,
+                  "tokenKey": "VariableID:89b9a7e1dd7bfb84ae3d5f16897de0b3c2d191b4/3541:123",
+                  "colorHex": "#F2F3F5"
                 }
               ],
               "fillToken": "VariableID:89b9a7e1dd7bfb84ae3d5f16897de0b3c2d191b4/3541:123"
@@ -95,7 +142,9 @@
                     "a": 0.88
                   },
                   "visible": true,
-                  "opacity": 0.8799999952316284
+                  "opacity": 0.8799999952316284,
+                  "tokenKey": "VariableID:e86a96753bbf5affba4ec9ebf5bc294c4b824a97/3541:128",
+                  "colorHex": "#030306"
                 }
               ],
               "fillToken": "VariableID:e86a96753bbf5affba4ec9ebf5bc294c4b824a97/3541:128"
@@ -115,7 +164,9 @@
                     "a": 0.94
                   },
                   "visible": true,
-                  "opacity": 0.9399999976158142
+                  "opacity": 0.9399999976158142,
+                  "tokenKey": "VariableID:de53e1056e003a1b3aedbb9e81b2d767e4c85fa2/3541:135",
+                  "colorHex": "#FFFFFF"
                 }
               ],
               "fillToken": "VariableID:de53e1056e003a1b3aedbb9e81b2d767e4c85fa2/3541:135"
@@ -144,7 +195,9 @@
                     "a": 1
                   },
                   "visible": true,
-                  "opacity": 1
+                  "opacity": 1,
+                  "tokenKey": "VariableID:670794407ff9819e432cf06474f8498fe09cc8dd/1930:16",
+                  "colorHex": "#F2F3F5"
                 }
               ],
               "fillToken": "VariableID:670794407ff9819e432cf06474f8498fe09cc8dd/1930:16"
@@ -164,7 +217,9 @@
                     "a": 0.88
                   },
                   "visible": true,
-                  "opacity": 0.8799999952316284
+                  "opacity": 0.8799999952316284,
+                  "tokenKey": "VariableID:a85d96e37cfd4de58ccd8515f26255a3f86c4160/1930:7",
+                  "colorHex": "#030306"
                 }
               ],
               "fillToken": "VariableID:a85d96e37cfd4de58ccd8515f26255a3f86c4160/1930:7"
@@ -184,7 +239,9 @@
                     "a": 0.94
                   },
                   "visible": true,
-                  "opacity": 0.9399999976158142
+                  "opacity": 0.9399999976158142,
+                  "tokenKey": "VariableID:9d628b4143392a46dacd623e81b3de011d3cc6a1/1930:68",
+                  "colorHex": "#FFFFFF"
                 }
               ],
               "fillToken": "VariableID:9d628b4143392a46dacd623e81b3de011d3cc6a1/1930:68"
@@ -213,7 +270,9 @@
                     "a": 1
                   },
                   "visible": true,
-                  "opacity": 1
+                  "opacity": 1,
+                  "tokenKey": "VariableID:aa26b8f4b0aa0245c30526f8217f804393c953b7/3541:173",
+                  "colorHex": "#F2F3F5"
                 }
               ],
               "fillToken": "VariableID:aa26b8f4b0aa0245c30526f8217f804393c953b7/3541:173"
@@ -233,7 +292,9 @@
                     "a": 0.1
                   },
                   "visible": true,
-                  "opacity": 0.10000000149011612
+                  "opacity": 0.10000000149011612,
+                  "tokenKey": "VariableID:d344a6475fd206b89cf76bef3272e63e04bdf26d/3541:122",
+                  "colorHex": "#0F1937"
                 }
               ],
               "fillToken": "VariableID:d344a6475fd206b89cf76bef3272e63e04bdf26d/3541:122"
@@ -253,7 +314,9 @@
                     "a": 0.38
                   },
                   "visible": true,
-                  "opacity": 0.3799999952316284
+                  "opacity": 0.3799999952316284,
+                  "tokenKey": "VariableID:200cf1d87c5bdeebd8e77f6eb8fdd00757ce6f45/3541:198",
+                  "colorHex": "#05081D"
                 }
               ],
               "fillToken": "VariableID:200cf1d87c5bdeebd8e77f6eb8fdd00757ce6f45/3541:198"
@@ -282,7 +345,9 @@
                     "a": 1
                   },
                   "visible": true,
-                  "opacity": 1
+                  "opacity": 1,
+                  "tokenKey": "VariableID:5c4560d87fd790b82b543012eb93ad48b0575551/1930:4",
+                  "colorHex": "#F2F3F5"
                 }
               ],
               "fillToken": "VariableID:5c4560d87fd790b82b543012eb93ad48b0575551/1930:4"
@@ -302,7 +367,9 @@
                     "a": 0.1
                   },
                   "visible": true,
-                  "opacity": 0.10000000149011612
+                  "opacity": 0.10000000149011612,
+                  "tokenKey": "VariableID:6d3b509ca2f8ade8d1b395979d94c6b9268b7fbb/1930:11",
+                  "colorHex": "#0F1937"
                 }
               ],
               "fillToken": "VariableID:6d3b509ca2f8ade8d1b395979d94c6b9268b7fbb/1930:11"
@@ -322,7 +389,9 @@
                     "a": 0.38
                   },
                   "visible": true,
-                  "opacity": 0.3799999952316284
+                  "opacity": 0.3799999952316284,
+                  "tokenKey": "VariableID:2c6035a149d933e7d61465bf927a8d6e0bbdc0b2/1930:74",
+                  "colorHex": "#05081D"
                 }
               ],
               "fillToken": "VariableID:2c6035a149d933e7d61465bf927a8d6e0bbdc0b2/1930:74"
@@ -351,7 +420,9 @@
                     "a": 1
                   },
                   "visible": true,
-                  "opacity": 1
+                  "opacity": 1,
+                  "tokenKey": "VariableID:27b3eb029bb417d829b5b4eafd7c3ee2d6ad8e56/3541:188",
+                  "colorHex": "#1C1C1E"
                 }
               ],
               "fillToken": "VariableID:27b3eb029bb417d829b5b4eafd7c3ee2d6ad8e56/3541:188"
@@ -371,7 +442,9 @@
                     "a": 0.13
                   },
                   "visible": true,
-                  "opacity": 0.12999999523162842
+                  "opacity": 0.12999999523162842,
+                  "tokenKey": "VariableID:571bd9b6345e0fd4100bc6f257570d120f77b61b/3541:156",
+                  "colorHex": "#DEDEEE"
                 }
               ],
               "fillToken": "VariableID:571bd9b6345e0fd4100bc6f257570d120f77b61b/3541:156"
@@ -391,7 +464,9 @@
                     "a": 0.37
                   },
                   "visible": true,
-                  "opacity": 0.3700000047683716
+                  "opacity": 0.3700000047683716,
+                  "tokenKey": "VariableID:3fdc0c1392b0689ace91a3177985a662294830d9/3541:182",
+                  "colorHex": "#E9E9FA"
                 }
               ],
               "fillToken": "VariableID:3fdc0c1392b0689ace91a3177985a662294830d9/3541:182"
@@ -420,7 +495,9 @@
                     "a": 1
                   },
                   "visible": true,
-                  "opacity": 1
+                  "opacity": 1,
+                  "tokenKey": "VariableID:cc0082f40640801db179fbfe821ced7402eb108c/1930:9",
+                  "colorHex": "#1C1C1E"
                 }
               ],
               "fillToken": "VariableID:cc0082f40640801db179fbfe821ced7402eb108c/1930:9"
@@ -440,7 +517,9 @@
                     "a": 0.13
                   },
                   "visible": true,
-                  "opacity": 0.12999999523162842
+                  "opacity": 0.12999999523162842,
+                  "tokenKey": "VariableID:ab6a628c01ecc95af1aa3e42acba69381802c86f/1930:10",
+                  "colorHex": "#DEDEEE"
                 }
               ],
               "fillToken": "VariableID:ab6a628c01ecc95af1aa3e42acba69381802c86f/1930:10"
@@ -460,7 +539,9 @@
                     "a": 0.37
                   },
                   "visible": true,
-                  "opacity": 0.3700000047683716
+                  "opacity": 0.3700000047683716,
+                  "tokenKey": "VariableID:bb93abb38f4014656a4b38a39b52cb5961e370a1/1930:55",
+                  "colorHex": "#E9E9FA"
                 }
               ],
               "fillToken": "VariableID:bb93abb38f4014656a4b38a39b52cb5961e370a1/1930:55"
@@ -489,7 +570,9 @@
                     "a": 1
                   },
                   "visible": true,
-                  "opacity": 1
+                  "opacity": 1,
+                  "tokenKey": "VariableID:aa26b8f4b0aa0245c30526f8217f804393c953b7/3541:173",
+                  "colorHex": "#F2F3F5"
                 }
               ],
               "fillToken": "VariableID:aa26b8f4b0aa0245c30526f8217f804393c953b7/3541:173"
@@ -509,7 +592,9 @@
                     "a": 0.88
                   },
                   "visible": true,
-                  "opacity": 0.8799999952316284
+                  "opacity": 0.8799999952316284,
+                  "tokenKey": "VariableID:e86a96753bbf5affba4ec9ebf5bc294c4b824a97/3541:128",
+                  "colorHex": "#030306"
                 }
               ],
               "fillToken": "VariableID:e86a96753bbf5affba4ec9ebf5bc294c4b824a97/3541:128"
@@ -538,7 +623,9 @@
                     "a": 1
                   },
                   "visible": true,
-                  "opacity": 1
+                  "opacity": 1,
+                  "tokenKey": "VariableID:5c4560d87fd790b82b543012eb93ad48b0575551/1930:4",
+                  "colorHex": "#F2F3F5"
                 }
               ],
               "fillToken": "VariableID:5c4560d87fd790b82b543012eb93ad48b0575551/1930:4"
@@ -558,7 +645,9 @@
                     "a": 0.88
                   },
                   "visible": true,
-                  "opacity": 0.8799999952316284
+                  "opacity": 0.8799999952316284,
+                  "tokenKey": "VariableID:a85d96e37cfd4de58ccd8515f26255a3f86c4160/1930:7",
+                  "colorHex": "#030306"
                 }
               ],
               "fillToken": "VariableID:a85d96e37cfd4de58ccd8515f26255a3f86c4160/1930:7"
@@ -568,6 +657,21 @@
             "op": "update",
             "id": 7,
             "value": {
+              "fills": [
+                {
+                  "type": "SOLID",
+                  "color": {
+                    "r": 3,
+                    "g": 3,
+                    "b": 6,
+                    "a": 0.88
+                  },
+                  "visible": true,
+                  "opacity": 0.8799999952316284,
+                  "tokenKey": "VariableID:35ea1ba98cfbbc081b766a140740e82ab3e01c92/1930:77",
+                  "colorHex": "#030306"
+                }
+              ],
               "fillToken": "VariableID:35ea1ba98cfbbc081b766a140740e82ab3e01c92/1930:77"
             }
           }
@@ -594,7 +698,9 @@
                     "a": 1
                   },
                   "visible": true,
-                  "opacity": 1
+                  "opacity": 1,
+                  "tokenKey": "VariableID:27b3eb029bb417d829b5b4eafd7c3ee2d6ad8e56/3541:188",
+                  "colorHex": "#1C1C1E"
                 }
               ],
               "fillToken": "VariableID:27b3eb029bb417d829b5b4eafd7c3ee2d6ad8e56/3541:188"
@@ -614,7 +720,9 @@
                     "a": 0.94
                   },
                   "visible": true,
-                  "opacity": 0.9399999976158142
+                  "opacity": 0.9399999976158142,
+                  "tokenKey": "VariableID:de53e1056e003a1b3aedbb9e81b2d767e4c85fa2/3541:135",
+                  "colorHex": "#FFFFFF"
                 }
               ],
               "fillToken": "VariableID:de53e1056e003a1b3aedbb9e81b2d767e4c85fa2/3541:135"
@@ -643,7 +751,9 @@
                     "a": 1
                   },
                   "visible": true,
-                  "opacity": 1
+                  "opacity": 1,
+                  "tokenKey": "VariableID:cc0082f40640801db179fbfe821ced7402eb108c/1930:9",
+                  "colorHex": "#1C1C1E"
                 }
               ],
               "fillToken": "VariableID:cc0082f40640801db179fbfe821ced7402eb108c/1930:9"
@@ -653,6 +763,21 @@
             "op": "update",
             "id": 4,
             "value": {
+              "fills": [
+                {
+                  "type": "SOLID",
+                  "color": {
+                    "r": 255,
+                    "g": 255,
+                    "b": 255,
+                    "a": 0.94
+                  },
+                  "visible": true,
+                  "opacity": 0.9399999976158142,
+                  "tokenKey": "VariableID:3ae8a4cacc6e560441bd23207c4bf16316c166e0/1930:44",
+                  "colorHex": "#FFFFFF"
+                }
+              ],
               "fillToken": "VariableID:3ae8a4cacc6e560441bd23207c4bf16316c166e0/1930:44"
             }
           },
@@ -670,7 +795,9 @@
                     "a": 0.94
                   },
                   "visible": true,
-                  "opacity": 0.9399999976158142
+                  "opacity": 0.9399999976158142,
+                  "tokenKey": "VariableID:9d628b4143392a46dacd623e81b3de011d3cc6a1/1930:68",
+                  "colorHex": "#FFFFFF"
                 }
               ],
               "fillToken": "VariableID:9d628b4143392a46dacd623e81b3de011d3cc6a1/1930:68"
@@ -699,7 +826,9 @@
                     "a": 1
                   },
                   "visible": true,
-                  "opacity": 1
+                  "opacity": 1,
+                  "tokenKey": "VariableID:aa26b8f4b0aa0245c30526f8217f804393c953b7/3541:173",
+                  "colorHex": "#F2F3F5"
                 }
               ],
               "fillToken": "VariableID:aa26b8f4b0aa0245c30526f8217f804393c953b7/3541:173"
@@ -719,7 +848,9 @@
                     "a": 0.1
                   },
                   "visible": true,
-                  "opacity": 0.10000000149011612
+                  "opacity": 0.10000000149011612,
+                  "tokenKey": "VariableID:d344a6475fd206b89cf76bef3272e63e04bdf26d/3541:122",
+                  "colorHex": "#0F1937"
                 }
               ],
               "fillToken": "VariableID:d344a6475fd206b89cf76bef3272e63e04bdf26d/3541:122"
@@ -739,7 +870,9 @@
                     "a": 0.38
                   },
                   "visible": true,
-                  "opacity": 0.3799999952316284
+                  "opacity": 0.3799999952316284,
+                  "tokenKey": "VariableID:200cf1d87c5bdeebd8e77f6eb8fdd00757ce6f45/3541:198",
+                  "colorHex": "#05081D"
                 }
               ],
               "fillToken": "VariableID:200cf1d87c5bdeebd8e77f6eb8fdd00757ce6f45/3541:198"
@@ -768,7 +901,9 @@
                     "a": 1
                   },
                   "visible": true,
-                  "opacity": 1
+                  "opacity": 1,
+                  "tokenKey": "VariableID:5c4560d87fd790b82b543012eb93ad48b0575551/1930:4",
+                  "colorHex": "#F2F3F5"
                 }
               ],
               "fillToken": "VariableID:5c4560d87fd790b82b543012eb93ad48b0575551/1930:4"
@@ -788,7 +923,9 @@
                     "a": 0.1
                   },
                   "visible": true,
-                  "opacity": 0.10000000149011612
+                  "opacity": 0.10000000149011612,
+                  "tokenKey": "VariableID:6d3b509ca2f8ade8d1b395979d94c6b9268b7fbb/1930:11",
+                  "colorHex": "#0F1937"
                 }
               ],
               "fillToken": "VariableID:6d3b509ca2f8ade8d1b395979d94c6b9268b7fbb/1930:11"
@@ -808,7 +945,9 @@
                     "a": 0.38
                   },
                   "visible": true,
-                  "opacity": 0.3799999952316284
+                  "opacity": 0.3799999952316284,
+                  "tokenKey": "VariableID:2c6035a149d933e7d61465bf927a8d6e0bbdc0b2/1930:74",
+                  "colorHex": "#05081D"
                 }
               ],
               "fillToken": "VariableID:2c6035a149d933e7d61465bf927a8d6e0bbdc0b2/1930:74"
@@ -837,7 +976,9 @@
                     "a": 1
                   },
                   "visible": true,
-                  "opacity": 1
+                  "opacity": 1,
+                  "tokenKey": "VariableID:27b3eb029bb417d829b5b4eafd7c3ee2d6ad8e56/3541:188",
+                  "colorHex": "#1C1C1E"
                 }
               ],
               "fillToken": "VariableID:27b3eb029bb417d829b5b4eafd7c3ee2d6ad8e56/3541:188"
@@ -857,7 +998,9 @@
                     "a": 0.13
                   },
                   "visible": true,
-                  "opacity": 0.12999999523162842
+                  "opacity": 0.12999999523162842,
+                  "tokenKey": "VariableID:571bd9b6345e0fd4100bc6f257570d120f77b61b/3541:156",
+                  "colorHex": "#DEDEEE"
                 }
               ],
               "fillToken": "VariableID:571bd9b6345e0fd4100bc6f257570d120f77b61b/3541:156"
@@ -877,7 +1020,9 @@
                     "a": 0.37
                   },
                   "visible": true,
-                  "opacity": 0.3700000047683716
+                  "opacity": 0.3700000047683716,
+                  "tokenKey": "VariableID:3fdc0c1392b0689ace91a3177985a662294830d9/3541:182",
+                  "colorHex": "#E9E9FA"
                 }
               ],
               "fillToken": "VariableID:3fdc0c1392b0689ace91a3177985a662294830d9/3541:182"
@@ -906,7 +1051,9 @@
                     "a": 1
                   },
                   "visible": true,
-                  "opacity": 1
+                  "opacity": 1,
+                  "tokenKey": "VariableID:cc0082f40640801db179fbfe821ced7402eb108c/1930:9",
+                  "colorHex": "#1C1C1E"
                 }
               ],
               "fillToken": "VariableID:cc0082f40640801db179fbfe821ced7402eb108c/1930:9"
@@ -926,7 +1073,9 @@
                     "a": 0.13
                   },
                   "visible": true,
-                  "opacity": 0.12999999523162842
+                  "opacity": 0.12999999523162842,
+                  "tokenKey": "VariableID:ab6a628c01ecc95af1aa3e42acba69381802c86f/1930:10",
+                  "colorHex": "#DEDEEE"
                 }
               ],
               "fillToken": "VariableID:ab6a628c01ecc95af1aa3e42acba69381802c86f/1930:10"
@@ -946,7 +1095,9 @@
                     "a": 0.37
                   },
                   "visible": true,
-                  "opacity": 0.3700000047683716
+                  "opacity": 0.3700000047683716,
+                  "tokenKey": "VariableID:bb93abb38f4014656a4b38a39b52cb5961e370a1/1930:55",
+                  "colorHex": "#E9E9FA"
                 }
               ],
               "fillToken": "VariableID:bb93abb38f4014656a4b38a39b52cb5961e370a1/1930:55"

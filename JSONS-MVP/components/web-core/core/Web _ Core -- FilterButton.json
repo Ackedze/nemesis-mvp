@@ -3,7 +3,7 @@
   "source": {
     "library": "Web :: Core",
     "file": "Web :: Core",
-    "generatedAt": "2025-12-26T12:46:59.999Z",
+    "generatedAt": "2025-12-30T07:04:58.122Z",
     "exportVersion": "0.1.0",
     "scope": "current-page",
     "files": [
@@ -178,7 +178,9 @@
                     "a": 0.94
                   },
                   "visible": true,
-                  "opacity": 0.9399999976158142
+                  "opacity": 0.9399999976158142,
+                  "tokenKey": "VariableID:9d628b4143392a46dacd623e81b3de011d3cc6a1/1930:68",
+                  "colorHex": "#FFFFFF"
                 }
               ],
               "fillToken": "VariableID:9d628b4143392a46dacd623e81b3de011d3cc6a1/1930:68",
@@ -272,7 +274,9 @@
                     "a": 0.94
                   },
                   "visible": true,
-                  "opacity": 0.9399999976158142
+                  "opacity": 0.9399999976158142,
+                  "tokenKey": "VariableID:9d628b4143392a46dacd623e81b3de011d3cc6a1/1930:68",
+                  "colorHex": "#FFFFFF"
                 }
               ],
               "fillToken": "VariableID:9d628b4143392a46dacd623e81b3de011d3cc6a1/1930:68",
@@ -482,7 +486,9 @@
                     "a": 0.94
                   },
                   "visible": true,
-                  "opacity": 0.9399999976158142
+                  "opacity": 0.9399999976158142,
+                  "tokenKey": "VariableID:9d628b4143392a46dacd623e81b3de011d3cc6a1/1930:68",
+                  "colorHex": "#FFFFFF"
                 }
               ],
               "fillToken": "VariableID:9d628b4143392a46dacd623e81b3de011d3cc6a1/1930:68",
@@ -576,7 +582,9 @@
                     "a": 0.94
                   },
                   "visible": true,
-                  "opacity": 0.9399999976158142
+                  "opacity": 0.9399999976158142,
+                  "tokenKey": "VariableID:9d628b4143392a46dacd623e81b3de011d3cc6a1/1930:68",
+                  "colorHex": "#FFFFFF"
                 }
               ],
               "fillToken": "VariableID:9d628b4143392a46dacd623e81b3de011d3cc6a1/1930:68",
@@ -786,7 +794,9 @@
                     "a": 0.94
                   },
                   "visible": true,
-                  "opacity": 0.9399999976158142
+                  "opacity": 0.9399999976158142,
+                  "tokenKey": "VariableID:9d628b4143392a46dacd623e81b3de011d3cc6a1/1930:68",
+                  "colorHex": "#FFFFFF"
                 }
               ],
               "fillToken": "VariableID:9d628b4143392a46dacd623e81b3de011d3cc6a1/1930:68",
@@ -880,7 +890,9 @@
                     "a": 0.94
                   },
                   "visible": true,
-                  "opacity": 0.9399999976158142
+                  "opacity": 0.9399999976158142,
+                  "tokenKey": "VariableID:9d628b4143392a46dacd623e81b3de011d3cc6a1/1930:68",
+                  "colorHex": "#FFFFFF"
                 }
               ],
               "fillToken": "VariableID:9d628b4143392a46dacd623e81b3de011d3cc6a1/1930:68",
@@ -1090,7 +1102,9 @@
                     "a": 0.94
                   },
                   "visible": true,
-                  "opacity": 0.9399999976158142
+                  "opacity": 0.9399999976158142,
+                  "tokenKey": "VariableID:9d628b4143392a46dacd623e81b3de011d3cc6a1/1930:68",
+                  "colorHex": "#FFFFFF"
                 }
               ],
               "fillToken": "VariableID:9d628b4143392a46dacd623e81b3de011d3cc6a1/1930:68",
@@ -1184,7 +1198,9 @@
                     "a": 0.94
                   },
                   "visible": true,
-                  "opacity": 0.9399999976158142
+                  "opacity": 0.9399999976158142,
+                  "tokenKey": "VariableID:9d628b4143392a46dacd623e81b3de011d3cc6a1/1930:68",
+                  "colorHex": "#FFFFFF"
                 }
               ],
               "fillToken": "VariableID:9d628b4143392a46dacd623e81b3de011d3cc6a1/1930:68",
