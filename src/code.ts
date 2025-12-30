@@ -247,6 +247,11 @@ async function runAudit() {
       return;
     }
 
+    // Убираем из таба "Актуальные" компоненты с ошибкой темизации — они уже отображаются в табе "Ошибки темизации".
+    relevanceBuckets.current = relevanceBuckets.current.filter(
+      (item) => item.themeStatus !== 'error',
+    );
+
     const textNodeOptions: TextNodeCollectionOptions = {
       tokenLabelMap: tokenLabelMap ?? new Map(),
       tokenColorMap: tokenColorMap ?? new Map(),

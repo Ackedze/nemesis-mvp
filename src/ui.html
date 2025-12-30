@@ -1122,7 +1122,11 @@
           if (item.platform) statusSegments.push({ text: item.platform, muted: true });
           if (item.role) statusSegments.push({ text: item.role, muted: true });
           if (item.status) statusSegments.push({ text: item.status, muted: true });
-          if (item.themeStatus) statusSegments.push({ text: item.themeStatus, muted: true });
+          const isThemeErrorWithRecommendation =
+            item.themeStatus === 'error' && item.themeRecommendation;
+          if (!isThemeErrorWithRecommendation && item.themeStatus) {
+            statusSegments.push({ text: item.themeStatus, muted: true });
+          }
           const lines = [
             buildCardLine({
               segments,
@@ -1131,6 +1135,15 @@
               showIcon: true,
             }),
           ];
+          if (item.themeStatus === 'error' && item.themeRecommendation) {
+            lines.push(
+              buildCardLine({
+                segments: [
+                  { text: `→ ${item.themeRecommendation}`, muted: true },
+                ],
+              }),
+            );
+          }
           if (statusSegments.length) {
             lines.push(buildCardLine({ segments: statusSegments }));
           }
