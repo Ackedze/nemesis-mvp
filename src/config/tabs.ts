@@ -7,8 +7,7 @@ export type TabId =
   | 'themeError'
   | 'presets'
   | 'local'
-  | 'customStyles'
-  | 'textAll';
+  | 'customStyles';
 
 export type TabBuilderKey =
   | 'audit'
@@ -84,13 +83,6 @@ export const tabDefinitions: TabDefinition[] = [
     title: 'Кастомные стили',
     emptyMessage: 'Кастомных стилей не найдено',
     builder: 'customStyles',
-    ignoreComponentFilter: true,
-  },
-  {
-    id: 'textAll',
-    title: 'Все тексты',
-    emptyMessage: 'Текстов не найдено',
-    builder: 'textEntry',
     ignoreComponentFilter: true,
   },
 ];

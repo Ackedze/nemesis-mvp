@@ -502,7 +502,7 @@
           </div>
         </aside>
         <main class="main">
-          <section id="gpt-card" class="gpt-card">
+          <section id="gpt-card" class="gpt-card hidden" hidden aria-hidden="true">
             <div class="gpt-card-header">
               <span class="gpt-card-title"
                 >Проверка текстов через Yandex Cloud AI</span
@@ -658,12 +658,11 @@
         const summaryCountEl = document.getElementById('summary-count');
         const toastEl = document.getElementById('toast');
         const filterVisibleEl = document.getElementById('filter-visible');
-        const gptInputEl = document.getElementById('gpt-input');
-        const gptFillButton = document.getElementById('gpt-fill-button');
-        const gptSubmitButton = document.getElementById('gpt-submit');
-        const gptStatusEl = document.getElementById('gpt-status');
-        const gptResultEl = document.getElementById('gpt-result');
-        const gptCardPanel = document.getElementById('gpt-card');
+          const gptInputEl = document.getElementById('gpt-input');
+          const gptFillButton = document.getElementById('gpt-fill-button');
+          const gptSubmitButton = document.getElementById('gpt-submit');
+          const gptStatusEl = document.getElementById('gpt-status');
+          const gptResultEl = document.getElementById('gpt-result');
 
         const filters = {
           visibleOnly: true,
@@ -766,7 +765,6 @@
           currentTab = tab.id;
           updateActiveTabClasses();
           renderList();
-          updateGptPanelVisibility();
         }
 
         function updateActiveTabClasses() {
@@ -829,12 +827,6 @@
           placeholder.className = 'placeholder';
           placeholder.textContent = message;
           listContainer.appendChild(placeholder);
-        }
-
-        function updateGptPanelVisibility() {
-          if (!gptCardPanel) return;
-          const shouldShow = currentTab === 'textAll';
-          gptCardPanel.classList.toggle('hidden', !shouldShow);
         }
 
         const TECHNICAL_DIFF_PATTERN = /(Token\s)|(token:)|(VariableID:)/i;
@@ -1274,6 +1266,7 @@
           }
         }
 
+        // Собирает текстовые узлы из payload-а и наполняет GPT-панель, даже без видимого таба.
         function fillGptTextFromResults({ manualTrigger = false } = {}) {
           if (!gptInputEl) return;
           const nodes = currentResults?.views?.textAll ?? [];

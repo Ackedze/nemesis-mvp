@@ -251,6 +251,7 @@ async function runAudit() {
       tokenLabelMap: tokenLabelMap ?? new Map(),
       tokenColorMap: tokenColorMap ?? new Map(),
     };
+    // `textAll` продолжает собирать все текстовые узлы для панели GPT, даже без отдельного таба.
     const allTextNodes = collectTextNodesFromSelection(selection, textNodeOptions);
     const missingTokenTextNodes = allTextNodes.filter(
       (entry) => !entry.usesToken && !entry.usesStyle,

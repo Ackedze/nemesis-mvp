@@ -190,6 +190,26 @@
       "path": "components/web-core/core/Web _ Core -- WebView.json"
     },
     {
+      "fileName": "components/web-core/navigation/Web _ Core Navigation -- NavigationBar.json",
+      "path": "components/web-core/navigation/Web _ Core Navigation -- NavigationBar.json"
+    },
+    {
+      "fileName": "components/web-core/navigation/Web _ Core Navigation -- PageIndicator.json",
+      "path": "components/web-core/navigation/Web _ Core Navigation -- PageIndicator.json"
+    },
+    {
+      "fileName": "components/web-core/navigation/Web _ Core Navigation -- Pagination.json",
+      "path": "components/web-core/navigation/Web _ Core Navigation -- Pagination.json"
+    },
+    {
+      "fileName": "components/web-core/navigation/Web _ Core Navigation -- Tabbar.json",
+      "path": "components/web-core/navigation/Web _ Core Navigation -- Tabbar.json"
+    },
+    {
+      "fileName": "components/web-core/navigation/Web _ Core Navigation -- Tabs.json",
+      "path": "components/web-core/navigation/Web _ Core Navigation -- Tabs.json"
+    },
+    {
       "fileName": "components/web-corp/Web _ Corp Components -- AccountSelect.json",
       "path": "components/web-corp/Web _ Corp Components -- AccountSelect.json"
     },
