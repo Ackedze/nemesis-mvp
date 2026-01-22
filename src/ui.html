@@ -658,11 +658,11 @@
         const summaryCountEl = document.getElementById('summary-count');
         const toastEl = document.getElementById('toast');
         const filterVisibleEl = document.getElementById('filter-visible');
-          const gptInputEl = document.getElementById('gpt-input');
-          const gptFillButton = document.getElementById('gpt-fill-button');
-          const gptSubmitButton = document.getElementById('gpt-submit');
-          const gptStatusEl = document.getElementById('gpt-status');
-          const gptResultEl = document.getElementById('gpt-result');
+        const gptInputEl = document.getElementById('gpt-input');
+        const gptFillButton = document.getElementById('gpt-fill-button');
+        const gptSubmitButton = document.getElementById('gpt-submit');
+        const gptStatusEl = document.getElementById('gpt-status');
+        const gptResultEl = document.getElementById('gpt-result');
 
         const filters = {
           visibleOnly: true,
@@ -683,10 +683,12 @@
         if (headerTitleEl) {
           headerTitleEl.onclick = () => {
             if (!latestSnapshot) return;
+
             const payload = JSON.stringify(latestSnapshot, null, 2);
             const blob = new Blob([payload], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
+
             link.href = url;
             link.download = `normalized-snapshot-${Date.now()}.json`;
             document.body.appendChild(link);
@@ -708,6 +710,7 @@
         function initFilterControls() {
           if (filterVisibleEl instanceof HTMLInputElement) {
             filters.visibleOnly = filterVisibleEl.checked;
+            
             filterVisibleEl.addEventListener('change', () => {
               filters.visibleOnly = filterVisibleEl.checked;
               renderList();

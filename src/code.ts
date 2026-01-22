@@ -3,32 +3,29 @@
 import {
   areReferenceCatalogsReady,
   ensureReferenceCatalogsLoaded,
-  findComponentByKeyOrName,
+  findComponent,
   getCorporateCounterpart,
   getStyleCatalogs,
   getTokenCatalogs,
-  LibraryComponent,
   primaryCatalog,
   reportMissingReference,
-  resolveStructure,
 } from './reference/library';
-import { snapshotTree, snapshotNormalizedContext } from './structure/snapshot';
-import { DiffEntry, diffStructures } from './structure/diff';
-import type { DSStructureNode } from './types/structures';
+import {LibraryComponent} from './reference/libraryTypes'
+import { snapshotNode } from './structure/snapshot';
+import { diffStructures } from './structure/diff';
+import type { DSNormalizedSnapshot, DSStructureNode } from './types/structures';
 import type { AuditItem, RelevanceStatus, ThemeStatus } from './types/audit';
 import { tabDefinitions } from './config/tabs';
 import { eyeClosedIcon, eyeOpenIcon } from './icons';
 import { buildNodePath, clampColorComponent, extractAliasKey, getPageName } from './utils/nodeHelpers';
 import {
-  collectCustomStyleEntries,
-  collectDetachedEntries,
-  collectTextNodesFromSelection,
+  collectCustomStyles,
+  collectDetachedEntry,
   computeChangesResults,
-  describeCustomStyleReasons,
-  filterVisibleEntries,
-  TextNodeCollectionOptions,
   type CustomStyleCollectionOptions,
 } from './services/auditViewBuilder';
+import { CheckState, createCheckState } from './create-check-state';
+import { getComponentKeyWithCache, initCache, saveCacheToStorage } from './services/figmaCache';
 
 figma.showUI(__html__, { width: 800, height: 860 });
 figma.ui.postMessage({
@@ -40,9 +37,13 @@ figma.ui.postMessage({
   type: 'tab-config',
   payload: tabDefinitions,
 });
-startCatalogPreload();
 
-figma.ui.onmessage = async (msg) => {
+startCatalogPreload();
+let instancesCache: Map<string, string>;
+
+(async () => initCache())().then((result) => instancesCache = result);
+
+figma.ui.onmessage = (msg) => {
   if (msg.type === 'ping') {
     figma.ui.postMessage({ type: 'pong' });
     return;
@@ -50,7 +51,8 @@ figma.ui.onmessage = async (msg) => {
 
   if (msg.type === 'scan-selection') {
     try {
-      await runAudit();
+      console.log('audit start');
+      runAudit();
     } catch (error) {
       console.error('scan failed', error);
     }
@@ -64,11 +66,6 @@ figma.ui.onmessage = async (msg) => {
     return;
   }
 
-  if (msg.type === 'gpt-request') {
-    await handleGptRequest(msg.payload);
-    return;
-  }
-
   if (msg.type === 'focus-node') {
     focusNode(msg.payload?.id).catch((error) => {
       console.error('Failed to focus node', error);
@@ -78,11 +75,20 @@ figma.ui.onmessage = async (msg) => {
   }
 };
 
+figma.on('close', async () => {
+  await saveCacheToStorage(instancesCache)
+})
+
 let scanInProgress = false;
 let cancelRequested = false;
 let catalogPreloadStarted = false;
 let catalogPreloadFinished = false;
 const STRICT_COMPARISON = true;
+
+export const getTimestamp = () =>
+  typeof performance !== 'undefined' && performance.now
+    ? performance.now()
+    : Date.now();
 
 let tokenLabelMap: Map<string, { label: string; library?: string }> | null =
   null;
@@ -92,9 +98,6 @@ let tokenLabelLoadPromise: Promise<void> | null = null;
 let styleLabelMap: Map<string, { label: string; library?: string }> | null =
   null;
 let styleLabelLoadPromise: Promise<void> | null = null;
-let gptRequestActive = false;
-const LLM_PROXY_ENDPOINT = 'http://localhost:3000/yandex-llm';
-const YANDEX_MODEL = 'gpt-4o-mini';
 
 /**
  * Запускает полный аудит текущего выделения: проверяет готовность справочников,
@@ -107,23 +110,28 @@ async function runAudit() {
   }
   scanInProgress = true;
   cancelRequested = false;
+
   figma.ui.postMessage({ type: 'scan-started' });
+
   let finished = false;
-  const getTimestamp = () =>
-    typeof performance !== 'undefined' && performance.now
-      ? performance.now()
-      : Date.now();
+
   const auditStart = getTimestamp();
+
   const finalize = (status: 'finished' | 'cancelled') => {
     if (finished) return;
+
     finished = true;
+
     if (status === 'cancelled') {
       figma.ui.postMessage({ type: 'scan-cancelled' });
     } else {
       figma.ui.postMessage({ type: 'scan-finished' });
     }
+
     scanInProgress = false;
+
     cancelRequested = false;
+
     console.log(
       `[Nemesis] audit total: ${(getTimestamp() - auditStart).toFixed(
         1,
@@ -134,8 +142,10 @@ async function runAudit() {
   const abortIfNeeded = () => {
     if (cancelRequested) {
       finalize('cancelled');
+
       return true;
     }
+
     return false;
   };
 
@@ -143,192 +153,154 @@ async function runAudit() {
     if (!areReferenceCatalogsReady()) {
       figma.notify('Подключаемся к библиотекам Nemesis…');
     }
+
     await ensureReferenceCatalogsLoaded();
     await ensureTokenLabelMapLoaded();
     await ensureStyleLabelMapLoaded();
+
   } catch (error) {
     console.error('Failed to load reference catalogs', error);
+
     const message =
       'Не удалось загрузить данные библиотеки. Проверьте интернет-соединение и попробуйте ещё раз.';
+
     figma.notify(message);
+
     figma.ui.postMessage({ type: 'scan-error', payload: { message } });
+
     finalize('finished');
+
     return;
   }
 
   try {
     const selection = figma.currentPage.selection;
+
     if (selection.length === 0) {
       const message = 'Выделите область или слой, чтобы проверить компоненты.';
+
       figma.notify(message);
+
       figma.ui.postMessage({ type: 'scan-error', payload: { message } });
+
       finalize('finished');
+
       return;
     }
 
-    const normalizedSnapshots = [];
-    for (const node of selection) {
-      try {
-        const normalized = await snapshotNormalizedContext(node);
-        console.log('[Nemesis] normalized snapshot', normalized);
-        normalizedSnapshots.push(normalized);
-      } catch (error) {
-        console.warn('[Nemesis] normalized snapshot failed', error);
-      }
-    }
-    figma.ui.postMessage({
-      type: 'normalized-snapshot-ready',
-      payload: normalizedSnapshots.length ? normalizedSnapshots : null,
-    });
+    // // ??? Зачем это нужно
+    // const normalizedSnapshots = [];
+    
+    // for (const node of selection) {
+    //   try {
+    //     const start = getTimestamp();
+    //     console.log('start snapshot', getTimestamp())
+    //     const normalized = await snapshotNormalizedContext(node);
+    //     console.log('end snapshot', (getTimestamp() - start).toFixed(1))
+    //     console.log('[Nemesis] normalized snapshot', normalized);
 
-    const targets = collectTargets(selection);
-    if (targets.length === 0) {
-      const message = 'Компоненты или инстансы в выделении не найдены.';
-      figma.notify(message);
-      figma.ui.postMessage({ type: 'scan-error', payload: { message } });
-    }
+    //     normalizedSnapshots.push(normalized);
+    //   } catch (error) {
+    //     console.warn('[Nemesis] normalized snapshot failed', error);
+    //   }
+    // }
 
-    const relevanceBuckets: Record<RelevanceStatus, AuditItem[]> = {
-      deprecated: [],
-      update: [],
-      current: [],
-      unknown: [],
-    };
-    const themeBuckets: Record<ThemeStatus, AuditItem[]> = {
-      ok: [],
-      error: [],
-    };
-    const localLibraryItems: AuditItem[] = [];
-    const presetItems: AuditItem[] = [];
+    // figma.ui.postMessage({
+    //   type: 'normalized-snapshot-ready',
+    //   payload: normalizedSnapshots.length ? normalizedSnapshots : null,
+    // });
+
+    const checkState = createCheckState()
+
     const referenceStructureCache = new Map<string, DSStructureNode[] | null>();
-    const classificationBatchSize = 4;
-    const customStyleEntries = collectCustomStyleEntries(selection, {
-      tokenLabelMap: tokenLabelMap ?? new Map(),
-    });
+
     const customStyleReasonOptions: CustomStyleCollectionOptions = {
       tokenLabelMap: tokenLabelMap ?? new Map(),
     };
 
-    for (
-      let offset = 0;
-      offset < targets.length;
-      offset += classificationBatchSize
-    ) {
-      if (abortIfNeeded()) {
-        return;
-      }
-      const batch = targets.slice(offset, offset + classificationBatchSize);
-      const items = await Promise.all(
-        batch.map((node) =>
-          classifyNode(node, referenceStructureCache, customStyleReasonOptions),
-        ),
-      );
-      for (const item of items) {
-        if (abortIfNeeded()) {
-          return;
-        }
-        relevanceBuckets[item.relevance].push(item);
-        themeBuckets[item.themeStatus].push(item);
-        if (item.isLocal) {
-          localLibraryItems.push(item);
-        }
-        if (isPresetCandidate(item)) {
-          presetItems.push(item);
-        }
-      }
+    await collectTargets(selection, checkState, referenceStructureCache, instancesCache, customStyleReasonOptions );
+    
+    if (checkState.totalItems === 0) {
+      const message = 'Компоненты или инстансы в выделении не найдены.';
+
+      figma.notify(message);
+      
+      figma.ui.postMessage({ type: 'scan-error', payload: { message } });
     }
 
     if (abortIfNeeded()) {
       return;
     }
 
-    // Убираем из таба "Актуальные" компоненты с ошибкой темизации — они уже отображаются в табе "Ошибки темизации".
-    relevanceBuckets.current = relevanceBuckets.current.filter(
-      (item) => item.themeStatus !== 'error',
-    );
+    // const textNodeOptions: TextNodeCollectionOptions = {
+    //   tokenLabelMap: tokenLabelMap ?? new Map(),
+    //   tokenColorMap: tokenColorMap ?? new Map(),
+    // };
 
-    const textNodeOptions: TextNodeCollectionOptions = {
-      tokenLabelMap: tokenLabelMap ?? new Map(),
-      tokenColorMap: tokenColorMap ?? new Map(),
-    };
-    // `textAll` продолжает собирать все текстовые узлы для панели GPT, даже без отдельного таба.
-    const allTextNodes = collectTextNodesFromSelection(selection, textNodeOptions);
-    const missingTokenTextNodes = allTextNodes.filter(
-      (entry) => !entry.usesToken && !entry.usesStyle,
-    );
-    const detachedEntries = collectDetachedEntries(selection);
+    // // `textAll` продолжает собирать все текстовые узлы для панели GPT, даже без отдельного таба.
+    // const allTextNodes = collectTextNodesFromSelection(selection, textNodeOptions);
+
+    // const missingTokenTextNodes = allTextNodes.filter(
+    //   (entry) => !entry.usesToken && !entry.usesStyle,
+    // );
+
     const counts = {
-      current: relevanceBuckets.current.length,
-      deprecated: relevanceBuckets.deprecated.length,
-      update: relevanceBuckets.update.length,
-      themeError: themeBuckets.error.length,
-      local: localLibraryItems.length,
-      textNodes: missingTokenTextNodes.length,
-      textAll: allTextNodes.length,
-      detached: detachedEntries.length,
+      current: checkState.relevanceBuckets.current.length,
+      deprecated: checkState.relevanceBuckets.deprecated.length,
+      update: checkState.relevanceBuckets.update.length,
+      themeError: checkState.themeBuckets.error.length,
+      local: checkState.localLibraryItems.length,
+      detached: checkState.detachedEntries,
       changes: 0,
     };
-    const changesResults = computeChangesResults(relevanceBuckets.current, {
-      visibleOnly: false,
-    });
-    const visibleChangesResults = computeChangesResults(
-      relevanceBuckets.current,
-      { visibleOnly: true },
-    );
+
+    const changesResults = computeChangesResults(checkState.relevanceBuckets.current);
+
     counts.changes = changesResults.length;
 
     const visibleViews = {
-      relevance: {
-        current: filterVisibleEntries(relevanceBuckets.current),
-        deprecated: filterVisibleEntries(relevanceBuckets.deprecated),
-        update: filterVisibleEntries(relevanceBuckets.update),
-        unknown: filterVisibleEntries(relevanceBuckets.unknown),
-      },
-      theme: {
-        ok: filterVisibleEntries(themeBuckets.ok),
-        error: filterVisibleEntries(themeBuckets.error),
-      },
-      local: filterVisibleEntries(localLibraryItems),
-      textNodes: filterVisibleEntries(missingTokenTextNodes),
-      textAll: filterVisibleEntries(allTextNodes),
-      customStyles: filterVisibleEntries(customStyleEntries),
-      detached: filterVisibleEntries(detachedEntries),
-      presets: filterVisibleEntries(presetItems),
-      changes: visibleChangesResults,
+      relevance: checkState.relevanceBuckets,
+      theme: checkState.themeBuckets,
+      local: checkState.localLibraryItems,
+      customStyles: checkState.customStyleEntries,
+      detached: checkState.detachedEntries,
+      presets: checkState.presetItems,
+      changes: changesResults,
     };
 
     figma.ui.postMessage({
       type: 'scan-result',
       payload: {
-        detached: detachedEntries,
+        detached: checkState.detachedEntries,
         counts,
         summary: {
-          totalTargets: targets.length,
+          totalTargets: checkState.totalItems,
           selectionRoots: selection.length,
           selectionNames: selection.map((node) => node.name),
           catalogName: primaryCatalog.name,
         },
         views: {
-          relevance: relevanceBuckets,
-          theme: themeBuckets,
-          local: localLibraryItems,
-          textNodes: missingTokenTextNodes,
-          textAll: allTextNodes,
-          customStyles: customStyleEntries,
-          detached: detachedEntries,
-          presets: presetItems,
+          relevance: checkState.relevanceBuckets,
+          theme: checkState.themeBuckets,
+          local: checkState.localLibraryItems,
+          customStyles: checkState.customStyleEntries,
+          detached: checkState.detachedEntries,
+          presets: checkState.presetItems,
         },
         visibleViews,
         changes: changesResults,
       },
     });
-
     finalize('finished');
   } catch (error) {
     console.error('Unhandled error during audit', error);
+
     const message = 'Не удалось завершить проверку. Подробности в консоли.';
+
     figma.notify(message);
+
     figma.ui.postMessage({ type: 'scan-error', payload: { message } });
+
     finalize('finished');
   }
 }
@@ -353,94 +325,176 @@ function startCatalogPreload() {
     });
 }
 
-/**
- * Рекурсивно собирает все компоненты и инстансы внутри выделения (кроме обычных фреймов),
- * чтобы мы могли прогнать их по справочнику.
- */
-function collectTargets(selection: readonly SceneNode[]): SceneNode[] {
-  const result: SceneNode[] = [];
-  const visit = (node: SceneNode) => {
-    if (node.type === 'INSTANCE' || node.type === 'COMPONENT') {
-      result.push(node);
-    }
 
-    if ('children' in node) {
-      for (const child of node.children as SceneNode[]) {
-        visit(child);
+async function collectTargets(
+  selection: readonly SceneNode[], 
+  checkState: CheckState, 
+  referenceStructureCache: Map<string, DSStructureNode[] | null>,
+  instancesCache: Map<string, string>,
+  customStyleReasonOptions: CustomStyleCollectionOptions
+) {
+  const visit = async (node: SceneNode): Promise<void> => {
+      if (!node.visible) {
+        return;
       }
-    }
+
+      if (node.type === 'INSTANCE' || node.type === 'COMPONENT') {
+        const item = await classifyNode(node, referenceStructureCache, instancesCache);
+
+        if (item) {
+          checkState.totalItems++;
+
+          if (item.relevance) {
+            checkState.relevanceBuckets[item.relevance].push(item);
+          }
+
+          if (item.themeStatus) {
+            checkState.themeBuckets[item.themeStatus].push(item);
+          }
+
+          if (item.isLocal) {
+            checkState.localLibraryItems.push(item);
+          }
+
+          if (isPresetCandidate(item)) {
+            checkState.presetItems.push(item);
+          }
+        }
+      }
+
+      if (node.type === 'FRAME' ||  node.type === 'GROUP') { 
+        const item = collectDetachedEntry(node);
+
+        if (item) {
+          checkState.detachedEntries.push(item);
+        }
+      }
+
+      if (node.type !== 'SECTION') {
+          const customStyleReasons = collectCustomStyles(node, customStyleReasonOptions);
+
+          if (customStyleReasons.length) {
+            checkState.customStyleEntries = [
+              ...checkState.customStyleEntries, 
+              ...customStyleReasons
+            ];
+          }
+      }
+
+      if ('children' in node && node.children.length > 0) {
+        for (const child of node.children) {
+          await visit(child as SceneNode);
+        }
+      }
   };
 
   for (const node of selection) {
-    visit(node as SceneNode);
+    await visit(node as SceneNode);
   }
-
-  return result;
 }
 
 /**
  * Приводит SceneNode к `AuditItem`: ищет компонент в каталогах, делает снапшот,
  * сравнивает структуру и собирает diff-последствия, статус темы и причины кастомизации.
  */
-/**
- * Приводит SceneNode к AuditItem: ищет компонент, подготавливает referenceStructure,
- * снимает snapshot, делает diff и собирает диагностические метаданные.
- */
 async function classifyNode(
   node: SceneNode,
   referenceStructureCache: Map<string, DSStructureNode[] | null>,
-  customStyleOptions: CustomStyleCollectionOptions,
-): Promise<AuditItem> {
-  const componentKey = await getComponentKey(node);
-  // instance key logging removed
-  const ref = findComponentByKeyOrName(componentKey, node.name);
-  const comparisonIssues: string[] = [];
-  if (!ref && componentKey) {
-    reportMissingReference(componentKey, node.name);
+  instancesCache: Map<string, string>
+): Promise<AuditItem | null> {
+  const nodeSegments = buildNodeSegments(node);
+
+  const pathSegments =
+    nodeSegments.length > 1
+      ? nodeSegments.slice(1)
+      : nodeSegments.length
+        ? nodeSegments
+        : [{ id: node.id, label: node.name }];
+
+  const pageName = getPageName(node);
+  const fullPath = buildNodePath(node);
+  const componentKey = await getComponentKey(node, instancesCache);
+  const ref = componentKey ? findComponent(componentKey): null;
+
+  if (!componentKey || !ref) {
+    reportMissingReference(node.name, componentKey);
+
+    return {
+      id: node.id,
+      name: node.name,
+      nodeType: node.type,
+      relevance: 'unknown',
+      themeStatus: 'ok',
+      isLocal: true,
+      pageName,
+      pathSegments,
+      fullPath,
+      librarySource: null,
+      componentKey,
+      comparisonIssues: [],
+      themeRecommendation: null,
+      diffs: []
+    }
   }
-  let referenceStructure = getReferenceStructureCached(
-    ref,
-    componentKey,
-    referenceStructureCache,
-  );
-  if (ref && componentKey && Array.isArray(ref.variants) && ref.variants.length) {
+
+  const comparisonIssues: string[] = [];
+
+  // let referenceStructure = getReferenceStructureCached(
+  //   ref,
+  //   componentKey,
+  //   referenceStructureCache,
+  // );
+  
+  let referenceStructure = ref.variantStructures?.[componentKey]
+    .filter((v) => v.op === 'update')
+    .reduce<DSStructureNode>((acc, item) => Object.assign(acc, item.value), {} as DSStructureNode) ?? null
+
+  if (!referenceStructure && Array.isArray(ref.variants) && ref.variants.length) {
+
     const variant = ref.variants.find((item) => item?.key === componentKey);
+
     if (!variant) {
       comparisonIssues.push(
         `Вариант ${componentKey} не найден в каталоге для «${ref.name ?? node.name}»`,
       );
+
       referenceStructure = null;
-    } else if (!ref.variantStructures || !ref.variantStructures[componentKey]) {
+    } else if (!referenceStructure && !ref.variantStructures || !ref.variantStructures?.[componentKey]) {
       comparisonIssues.push(
         `Нет variantStructures для «${variant.name ?? componentKey}» (${ref.name ?? node.name})`,
       );
+
       referenceStructure = null;
     }
   }
+
   const needsDiff = Boolean(referenceStructure);
+
   const instanceHasOverrides =
     node.type === 'INSTANCE' && hasInstanceOverrides(node as InstanceNode);
+
   const shouldDiff =
-    needsDiff && (ref?.status !== 'current' || instanceHasOverrides);
+    needsDiff && (ref.status !== 'current' || instanceHasOverrides);
+
   const actualStructure =
-    shouldDiff && referenceStructure ? await snapshotTree(node) : null;
-  const alignedActualStructure =
-    referenceStructure && actualStructure
-      ? alignStructurePaths(actualStructure, referenceStructure)
-      : actualStructure;
+    shouldDiff && referenceStructure ? await snapshotNode(node, fullPath) : null;
+
   const diffResult =
-    shouldDiff && referenceStructure && alignedActualStructure
-      ? diffStructures(alignedActualStructure, referenceStructure, {
+    shouldDiff && referenceStructure && actualStructure
+      ? diffStructures(actualStructure, referenceStructure, {
           strict: STRICT_COMPARISON,
           resolveTokenLabel: resolveTokenLabelForDiff,
           resolveColorLabel: resolveTokenLabelFromColor,
           resolveStyleLabel: resolveStyleLabelForDiff,
         })
       : { diffs: [], issues: [] };
+
   if (diffResult.issues.length) {
     comparisonIssues.push(...diffResult.issues);
   }
-  const diffs = diffResult.diffs;
+
+  const { diffs } = diffResult;
+
   if (comparisonIssues.length) {
     console.warn('[Nemesis] comparison issues', {
       nodeId: node.id,
@@ -451,14 +505,11 @@ async function classifyNode(
     });
   }
 
-  const isLocal = !ref;
-  const relevance = normalizeRelevanceStatus(ref?.status);
-
-  const pageName = getPageName(node);
-  const fullPath = buildNodePath(node);
+  const relevance = normalizeRelevanceStatus(ref.status);
 
   const themeMismatch = detectThemeMismatch(node, ref);
   const themeStatus: ThemeStatus = themeMismatch ? 'error' : 'ok';
+
   if (themeMismatch) {
     diffs.unshift({
       message: themeMismatch.message,
@@ -468,20 +519,6 @@ async function classifyNode(
     });
   }
 
-  const hasDiff = diffs.length > 0;
-  const nodeSegments = buildNodeSegments(node);
-  const pathSegments =
-    nodeSegments.length > 1
-      ? nodeSegments.slice(1)
-      : nodeSegments.length
-        ? nodeSegments
-        : [{ id: node.id, label: node.name }];
-  const customStyleReasons = describeCustomStyleReasons(
-    node,
-    customStyleOptions,
-  );
-  const hasCustomStyle = customStyleReasons.length > 0;
-
   return {
     id: node.id,
     name: node.name,
@@ -489,40 +526,28 @@ async function classifyNode(
     pageName,
     pathSegments,
     fullPath,
-    visible: 'visible' in node ? (node as any).visible !== false : true,
-    relevance,
+    relevance: themeStatus === 'ok' ? relevance : 'unknown',
     themeStatus,
     librarySource: ref?.source ?? null,
-    isLocal,
-    hasDiff,
+    isLocal: false,
     reference: ref,
     componentKey,
     diffs,
-    comparisonIssues: comparisonIssues.length ? comparisonIssues : undefined,
+    comparisonIssues,
     themeRecommendation: themeMismatch?.replacementName ?? null,
-    hasCustomStyle,
-    customStyleReasons,
   };
 }
 
-async function getComponentKey(node: SceneNode): Promise<string | null> {
+async function getComponentKey(node: SceneNode, instancesCache: Map<string, string>): Promise<string | null> {
   if (node.type === 'INSTANCE') {
-    return getInstanceMainComponentKey(node as InstanceNode);
+    return await getComponentKeyWithCache(node, instancesCache);
   }
+
   if (node.type === 'COMPONENT') {
     return node.key ?? null;
   }
-  return null;
-}
 
-async function getInstanceMainComponentKey(
-  inst: InstanceNode,
-): Promise<string | null> {
-  if (typeof inst.getMainComponentAsync === 'function') {
-    const main = await inst.getMainComponentAsync();
-    return main?.key ?? null;
-  }
-  return inst.mainComponent?.key ?? null;
+  return null;
 }
 
 /**
@@ -536,7 +561,8 @@ function hasInstanceOverrides(instance: InstanceNode): boolean {
 
 async function focusNode(nodeId: string | undefined) {
   if (!nodeId) return;
-  const node = await findNodeById(nodeId);
+  const node = await figma.getNodeByIdAsync(nodeId);
+
   if (!node || node.type === 'DOCUMENT') {
     figma.notify('Не удалось найти слой для перехода');
     return;
@@ -544,8 +570,10 @@ async function focusNode(nodeId: string | undefined) {
 
   let page: PageNode | null = null;
   let current: BaseNode | null = node;
+
   while (current) {
     if (current.type === 'PAGE') {
+
       page = current as PageNode;
       break;
     }
@@ -557,16 +585,12 @@ async function focusNode(nodeId: string | undefined) {
     return;
   }
 
-  if (typeof (figma as any).setCurrentPageAsync === 'function') {
-    try {
-      await (figma as any).setCurrentPageAsync(page);
-    } catch (error) {
-      console.error('Failed to switch page asynchronously', error);
-      figma.notify('Не удалось перейти на страницу слоя');
-      return;
-    }
-  } else {
-    figma.currentPage = page;
+  try {
+    await figma.setCurrentPageAsync(page)
+  } catch (error) {
+    console.error('Failed to switch page asynchronously', error);
+    figma.notify('Не удалось перейти на страницу слоя');
+    return;
   }
 
   try {
@@ -578,44 +602,11 @@ async function focusNode(nodeId: string | undefined) {
   }
 }
 
-async function findNodeById(nodeId: string): Promise<BaseNode | null> {
-  const getNodeByIdAsync = (figma as any).getNodeByIdAsync;
-  if (typeof getNodeByIdAsync === 'function') {
-    return (await getNodeByIdAsync(nodeId)) ?? null;
-  }
-  return figma.getNodeById(nodeId);
-}
-
-function getReferenceStructure(
-  ref: LibraryComponent | null | undefined,
-  variantKey: string | null,
-) {
-  if (!ref) return null;
-  const structure = resolveStructure(ref, variantKey);
-  if (structure && structure.length > 0) {
-    return structure;
-  }
-  return null;
-}
-
-function getReferenceStructureCached(
-  ref: LibraryComponent | null | undefined,
-  variantKey: string | null,
-  cache: Map<string, DSStructureNode[] | null>,
-): DSStructureNode[] | null {
-  if (!ref) return null;
-  const cacheKey = `${ref.key ?? ref.displayName ?? 'unknown'}:${variantKey ?? 'default'}`;
-  if (cache.has(cacheKey)) {
-    return cache.get(cacheKey) ?? null;
-  }
-  const structure = getReferenceStructure(ref, variantKey);
-  cache.set(cacheKey, structure);
-  return structure;
-}
-
 function buildNodeSegments(node: SceneNode): PathSegment[] {
   const segments: PathSegment[] = [];
+
   let current: BaseNode | null = node;
+
   while (current && current.type !== 'PAGE' && current.type !== 'DOCUMENT') {
     const nodeType = current.type;
     const hasVisibleFlag = 'visible' in current;
@@ -649,28 +640,6 @@ function normalizeRelevanceStatus(
   }
 }
 
-function alignStructurePaths(
-  actual: DSStructureNode[],
-  reference: DSStructureNode[],
-): DSStructureNode[] {
-  if (actual.length === 0 || reference.length === 0) return actual;
-  const actualRoot = actual[0].path;
-  const referenceRoot =
-    reference.find((node) => !node.path.includes(' / '))?.path ??
-    reference[0].path;
-  if (!actualRoot || !referenceRoot || actualRoot === referenceRoot) {
-    return actual;
-  }
-
-  const prefix = actualRoot;
-  const newPrefix = referenceRoot;
-  return actual.map((node) => {
-    const cloned = Object.assign({}, node);
-    cloned.path = replacePathPrefix(node.path, prefix, newPrefix);
-    return cloned;
-  });
-}
-
 type ThemeMismatchInfo = {
   message: string;
   replacementName?: string | null;
@@ -678,16 +647,20 @@ type ThemeMismatchInfo = {
 
 function detectThemeMismatch(
   node: SceneNode,
-  ref: LibraryComponent | null | undefined,
+  ref: LibraryComponent,
 ): ThemeMismatchInfo | null {
-  if (!ref) return null;
   if (ref.role === 'Part') return null;
+
   const name = ref.name ?? '';
+
   const pair = getCorporateCounterpart(name);
+
   if (!pair?.corporate) {
     return null;
   }
+
   const isCorpComponent = name.includes('[Corporate]');
+
   if (!isCorpComponent) {
     return {
       message: 'Доступен корпоративный вариант компонента',
@@ -697,13 +670,8 @@ function detectThemeMismatch(
         `[Corporate] ${pair.base?.name ?? ''}`.trim(),
     };
   }
-  return null;
-}
 
-function paintUsesToken(paint: Paint): boolean {
-  if (!paint || typeof paint !== 'object') return false;
-  const info = getTokenAliasInfo(paint as SolidPaint);
-  return Boolean(info.aliasKey);
+  return null;
 }
 
 function isPresetCandidate(item: AuditItem): boolean {
@@ -723,15 +691,6 @@ function hasLockSymbol(component: LibraryComponent): boolean {
     }
   }
   return false;
-}
-
-function replacePathPrefix(path: string, from: string, to: string): string {
-  if (path === from) return to;
-  const needle = `${from} / `;
-  if (path.startsWith(needle)) {
-    return `${to} / ${path.slice(needle.length)}`;
-  }
-  return path;
 }
 
 /**
@@ -918,109 +877,4 @@ function toRgbaStringFromToken(value: any): string | null {
   const b = clampColorComponent(value.b);
   const a = typeof value.a === 'number' ? Math.round(value.a * 100) / 100 : 1;
   return normalizeRgba(`rgba(${r},${g},${b},${a})`);
-}
-
-function getTokenAliasInfo(paint: SolidPaint) {
-  const boundVariables = paint.boundVariables;
-  if (!boundVariables?.color?.id) {
-    return { aliasKey: null, label: null, library: null, known: false };
-  }
-  const aliasKey = extractAliasKey(boundVariables.color.id);
-  if (!aliasKey) {
-    return { aliasKey: null, label: null, library: null, known: false };
-  }
-  const label = tokenLabelMap?.get(aliasKey);
-  return {
-    aliasKey,
-    label: label?.label ?? null,
-    library: label?.library ?? null,
-    known: Boolean(label),
-  };
-}
-
-function toHex(component: number): string {
-  const hex = component.toString(16).toUpperCase();
-  return hex.length === 1 ? '0' + hex : hex;
-}
-
-async function handleGptRequest(payload?: GptRequestPayload) {
-  if (gptRequestActive) {
-    figma.ui.postMessage({
-      type: 'gpt-error',
-      payload: { message: 'Запрос уже выполняется.' },
-    });
-    return;
-  }
-  if (!payload?.prompt) {
-    figma.ui.postMessage({
-      type: 'gpt-error',
-      payload: { message: 'Параметры запроса некорректны.' },
-    });
-    return;
-  }
-  gptRequestActive = true;
-  try {
-    const response = await fetch(LLM_PROXY_ENDPOINT, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        prompt: payload.prompt,
-      }),
-    });
-    if (!response.ok) {
-      const body = await response.text();
-      throw new Error(
-        `Сервер вернул ${response.status}: ${body.substring(0, 150)}`,
-      );
-    }
-    const data = await response.json();
-    const alternative = data?.result?.alternatives?.[0];
-    const textFromMessage = alternative?.message?.text;
-    const textFromContent =
-      Array.isArray(alternative?.content) &&
-      alternative.content
-        .map(
-          (segment) =>
-            (segment && typeof segment.text === 'string' && segment.text) ||
-            '',
-        )
-        .join('')
-        .trim();
-    const textFromChoices =
-      data?.choices?.[0]?.message?.content?.trim?.();
-    const textFromDirect =
-      typeof data?.text === 'string' ? data.text.trim() : null;
-    const resultValue =
-      textFromMessage ||
-      textFromDirect ||
-      textFromContent ||
-      textFromChoices ||
-      'Ответ отсутствует.';
-    console.log('nemesis gpt response', {
-      result: resultValue,
-      alternative,
-      raw: data,
-      prompt: payload.prompt,
-      reqId: data?.requestId ?? data?.reqId ?? null,
-    });
-    figma.ui.postMessage({
-      type: 'gpt-response',
-      payload: { text: resultValue },
-    });
-  } catch (error) {
-    console.error('Yandex Cloud AI request failed', error);
-    figma.ui.postMessage({
-      type: 'gpt-error',
-      payload: {
-        message:
-          error instanceof Error
-            ? error.message
-            : 'Не удалось получить ответ от Yandex Cloud AI.',
-      },
-    });
-  } finally {
-    gptRequestActive = false;
-  }
 }

@@ -1,4 +1,4 @@
-import type { LibraryComponent } from '../reference/library';
+import type { LibraryComponent } from '../reference/libraryTypes';
 import type { DiffEntry } from '../structure/diff';
 
 export type RelevanceStatus = 'deprecated' | 'update' | 'current' | 'unknown';
@@ -18,18 +18,15 @@ export interface AuditItem {
   pageName: string;
   pathSegments: PathSegment[];
   fullPath: string;
-  visible: boolean;
   relevance: RelevanceStatus;
   themeStatus: ThemeStatus;
   librarySource: string | null;
   isLocal: boolean;
-  hasDiff: boolean;
   reference?: LibraryComponent | null;
   componentKey: string | null;
   diffs: DiffEntry[];
   comparisonIssues?: string[];
   themeRecommendation?: string | null;
-  hasCustomStyle: boolean;
   customStyleReasons?: string[];
 }
 
@@ -52,7 +49,7 @@ export interface TextNodeEntry {
   value: string;
   visible: boolean;
   usesToken: boolean;
-  tokenLibrary?: string;
+  tokenLibrary: string | null;
   nodeType?: SceneNode['type'];
   usesStyle: boolean;
 }

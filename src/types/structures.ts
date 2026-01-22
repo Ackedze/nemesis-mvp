@@ -1,6 +1,6 @@
-export type DSLayoutDirection = 'H' | 'V' | null;
+type DSLayoutDirection = 'H' | 'V' | null;
 
-export interface DSPadding {
+interface DSPadding {
   top: number | null;
   right: number | null;
   bottom: number | null;
@@ -26,7 +26,7 @@ export interface DSNodeLayout {
   itemSpacingToken?: string | null;
 }
 
-export interface DSTokenReference {
+interface DSTokenReference {
   styleKey: string;
 }
 
@@ -37,12 +37,12 @@ export interface DSNodeStyles {
   effects?: DSTokenReference[] | null;
 }
 
-export interface DSPaintInfo {
+interface DSPaintInfo {
   color?: string | null;
   token?: string | null;
 }
 
-export interface DSStrokeInfo extends DSPaintInfo {
+interface DSStrokeInfo extends DSPaintInfo {
   weight?: number | null;
   align?: string | null;
 }
@@ -90,7 +90,7 @@ export interface DSStructureNode {
   layout?: DSNodeLayout;
   opacity?: number | null;
   opacityToken?: string | null;
-  radius?: DSRadii;
+  radius: DSRadii | null;
   radiusToken?: string | null;
   effects?: DSEffect[] | null;
   componentInstance?: DSInstanceInfo | null;
@@ -134,7 +134,7 @@ export interface DSNormalizedSnapshot {
   elements: DSNormalizedElement[];
 }
 
-export type DSStructureNodePatch = Partial<
+type DSStructureNodePatch = Partial<
   Pick<
     DSStructureNode,
     | 'path'
