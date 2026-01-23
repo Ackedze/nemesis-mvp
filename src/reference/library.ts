@@ -5,7 +5,7 @@ import {
   type ReferenceCatalogSource,
 } from './referenceList';
 import { fetchDirect } from '../utils/networkFetch';
-import fallbackCatalogList from './referenceSources.json';
+// import fallbackCatalogList from './referenceSources.json';
 import type {
   AthenaCatalog,
   AthenaComponent,
@@ -142,7 +142,9 @@ function parseCatalogPayload(raw: string, fileName: string): AthenaCatalog {
   return parsed;
 }
 
-async function loadTokenCatalogs(sources: ReferenceCatalogSource[]): Promise<void> {
+async function loadTokenCatalogs(
+  sources: ReferenceCatalogSource[],
+): Promise<void> {
   tokenCatalogs.length = 0;
   for (const source of sources) {
     try {
@@ -168,7 +170,9 @@ async function loadTokenCatalogs(sources: ReferenceCatalogSource[]): Promise<voi
   }
 }
 
-async function loadStyleCatalogs(sources: ReferenceCatalogSource[]): Promise<void> {
+async function loadStyleCatalogs(
+  sources: ReferenceCatalogSource[],
+): Promise<void> {
   styleCatalogs.length = 0;
   for (const source of sources) {
     try {
@@ -292,31 +296,43 @@ type NormalizedJsonComponent = {
 };
 
 function isAthenaCatalog(payload: unknown): payload is AthenaCatalog {
-  return Boolean(payload && typeof payload === 'object' && Array.isArray((payload as AthenaCatalog).components));
+  return Boolean(
+    payload &&
+      typeof payload === 'object' &&
+      Array.isArray((payload as AthenaCatalog).components),
+  );
 }
 
-function isNormalizedJsonCatalog(payload: unknown): payload is NormalizedJsonCatalog {
+function isNormalizedJsonCatalog(
+  payload: unknown,
+): payload is NormalizedJsonCatalog {
   if (!payload || typeof payload !== 'object') return false;
   const catalog = payload as NormalizedJsonCatalog;
   return catalog.kind === 'catalog' && Array.isArray(catalog.elements);
 }
 
-function parseNormalizedCatalog(raw: string, fileName: string): AthenaCatalog | null {
+function parseNormalizedCatalog(
+  raw: string,
+  fileName: string,
+): AthenaCatalog | null {
   const elements = parseNormalizedElements(raw);
   if (!elements.length) {
     return null;
   }
   const rootComponents = elements.filter((el) => el.type === 'COMPONENT');
   const grouped: AthenaComponent[] = [];
-  const fallbackKey = elements.find((el) => el.componentKey)?.componentKey ?? '';
+  const fallbackKey =
+    elements.find((el) => el.componentKey)?.componentKey ?? '';
 
   if (!rootComponents.length) {
-    grouped.push(buildComponentFromElements(
-      fileName,
-      elements[0]?.path?.split(' / ')[0] ?? fileName,
-      fallbackKey,
-      elements,
-    ));
+    grouped.push(
+      buildComponentFromElements(
+        fileName,
+        elements[0]?.path?.split(' / ')[0] ?? fileName,
+        fallbackKey,
+        elements,
+      ),
+    );
   } else {
     for (const root of rootComponents) {
       const rootPath = root.path;
@@ -364,15 +380,18 @@ function parseNormalizedCatalogFromElements(
   }
   const rootComponents = elements.filter((el) => el.type === 'COMPONENT');
   const grouped: AthenaComponent[] = [];
-  const fallbackKey = elements.find((el) => el.componentKey)?.componentKey ?? '';
+  const fallbackKey =
+    elements.find((el) => el.componentKey)?.componentKey ?? '';
 
   if (!rootComponents.length) {
-    grouped.push(buildComponentFromElements(
-      fileName,
-      elements[0]?.path?.split(' / ')[0] ?? fileName,
-      fallbackKey,
-      elements,
-    ));
+    grouped.push(
+      buildComponentFromElements(
+        fileName,
+        elements[0]?.path?.split(' / ')[0] ?? fileName,
+        fallbackKey,
+        elements,
+      ),
+    );
   } else {
     for (const root of rootComponents) {
       const rootPath = root.path;
@@ -487,7 +506,7 @@ function buildStructure(elements: NormalizedElement[]): DSStructureNode[] {
     const path = element.path;
     const parentPath = getParentPath(path);
     const name = getLastSegment(path);
-    const parentId = parentPath ? idByPath.get(parentPath) ?? null : null;
+    const parentId = parentPath ? (idByPath.get(parentPath) ?? null) : null;
 
     const node: DSStructureNode = {
       id,
@@ -522,7 +541,9 @@ function buildStructure(elements: NormalizedElement[]): DSStructureNode[] {
         color: element.stroke.color ?? null,
         token: element.stroke.token ?? null,
         weight:
-          typeof element.stroke.weight === 'number' ? element.stroke.weight : null,
+          typeof element.stroke.weight === 'number'
+            ? element.stroke.weight
+            : null,
         align: element.stroke.align ?? null,
       };
     }
@@ -625,7 +646,13 @@ function parseNormalizedElements(raw: string): NormalizedElement[] {
     }
     if (!current) continue;
 
-    if (trimmed === 'layout:' || trimmed === 'stroke:' || trimmed === 'fill:' || trimmed === 'text:' || trimmed === 'typography:') {
+    if (
+      trimmed === 'layout:' ||
+      trimmed === 'stroke:' ||
+      trimmed === 'fill:' ||
+      trimmed === 'text:' ||
+      trimmed === 'typography:'
+    ) {
       section = trimmed.replace(':', '');
       if (section === 'layout') {
         current.layout = {};
@@ -744,7 +771,10 @@ function hydrateCatalogs(modules: AthenaCatalog[]) {
       prepareComponent(component, module);
       registerPartUsage(component as unknown as LibraryComponent);
       validationWarnings.push(
-        ...validateCatalogComponent(component, module.meta?.fileName ?? 'unknown'),
+        ...validateCatalogComponent(
+          component,
+          module.meta?.fileName ?? 'unknown',
+        ),
       );
     }
   }
@@ -782,7 +812,9 @@ function validateCatalogComponent(
     return warnings;
   }
   const missingVariantKeys = component.variants
-    .filter((variant) => variant?.key && !component.variantStructures?.[variant.key])
+    .filter(
+      (variant) => variant?.key && !component.variantStructures?.[variant.key],
+    )
     .map((variant) => variant?.name ?? variant?.key ?? 'unknown');
   if (missingVariantKeys.length) {
     warnings.push(
@@ -1103,7 +1135,9 @@ function registerPartUsage(component: LibraryComponent) {
   if ((component as any).variantStructures) {
     for (const variantKey of Object.keys(component.variantStructures ?? {})) {
       registerFromNodes(resolveStructure(component, variantKey));
-      const variantEntry = Object.assign({}, component, { name: variantKey }) as LibraryComponent;
+      const variantEntry = Object.assign({}, component, {
+        name: variantKey,
+      }) as LibraryComponent;
       const canonicalName = normalizeCorporateName(component.name);
       if (canonicalName) {
         corporateNameIndex.set(
@@ -1115,14 +1149,19 @@ function registerPartUsage(component: LibraryComponent) {
   }
 }
 
-function normalizeCorporateName(name: string | null | undefined): string | null {
+function normalizeCorporateName(
+  name: string | null | undefined,
+): string | null {
   if (!name) return null;
   return name.replace(/\[(.+?)\]\s*/g, '').trim();
 }
 
 export function getCorporateCounterpart(
   componentName: string,
-): { base?: LibraryComponent | null; corporate?: LibraryComponent | null } | null {
+): {
+  base?: LibraryComponent | null;
+  corporate?: LibraryComponent | null;
+} | null {
   const canonical = normalizeCorporateName(componentName);
   if (!canonical) return null;
   const base =
