@@ -418,6 +418,14 @@
       "path": "components/web-corp-promo/Web _ Сorp Promo Components -- PromoTableView.json"
     },
     {
+      "fileName": "icons/Icons -- corp.json",
+      "path": "icons/Icons -- corp.json"
+    },
+    {
+      "fileName": "icons/Icons -- general (glyph).json",
+      "path": "icons/Icons -- general (glyph).json"
+    },
+    {
       "fileName": "components/Spacing -- Spacing component.json",
       "path": "components/Spacing -- Spacing component.json"
     },
