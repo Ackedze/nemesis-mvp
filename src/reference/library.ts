@@ -5,7 +5,7 @@ import {
   type ReferenceCatalogSource,
 } from './referenceList';
 import { fetchDirect } from '../utils/networkFetch';
-import fallbackCatalogList from './referenceSources.json';
+//import fallbackCatalogList from './referenceSources.json';
 import type {
   AthenaCatalog,
   AthenaComponent,
