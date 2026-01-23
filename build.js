@@ -2,6 +2,7 @@ const esbuild = require('esbuild');
 const fs = require('fs');
 const path = require('path');
 const isWatch = process.argv.includes('--watch');
+require('./scripts/prepareReferences');
 
 const common = {
   entryPoints: {
