@@ -426,6 +426,18 @@
       "path": "icons/Icons -- general (glyph).json"
     },
     {
+      "fileName": "logotypes/Logotypes -- general (logo).json",
+      "path": "logotypes/Logotypes -- general (logo).json"
+    },
+    {
+      "fileName": "logotypes/Logotypes -- logo-am.json",
+      "path": "logotypes/Logotypes -- logo-am.json"
+    },
+    {
+      "fileName": "logotypes/Logotypes -- logo-corp.json",
+      "path": "logotypes/Logotypes -- logo-corp.json"
+    },
+    {
       "fileName": "components/Spacing -- Spacing component.json",
       "path": "components/Spacing -- Spacing component.json"
     },
