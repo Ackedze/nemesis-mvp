@@ -1156,9 +1156,7 @@ function normalizeCorporateName(
   return name.replace(/\[(.+?)\]\s*/g, '').trim();
 }
 
-export function getCorporateCounterpart(
-  componentName: string,
-): {
+export function getCorporateCounterpart(componentName: string): {
   base?: LibraryComponent | null;
   corporate?: LibraryComponent | null;
 } | null {
