@@ -83,6 +83,8 @@ let cancelRequested = false;
 let catalogPreloadStarted = false;
 let catalogPreloadFinished = false;
 const STRICT_COMPARISON = true;
+// Compare nested instances against their own component references to avoid placeholder diffs.
+const COMPARE_NESTED_INSTANCES_BY_COMPONENT = true;
 
 let tokenLabelMap: Map<string, { label: string; library?: string }> | null =
   null;
@@ -428,9 +430,16 @@ async function classifyNode(
     referenceStructure && actualStructure
       ? alignStructurePaths(actualStructure, referenceStructure)
       : actualStructure;
+  const expandedReferenceStructure =
+    shouldDiff &&
+    referenceStructure &&
+    alignedActualStructure &&
+    COMPARE_NESTED_INSTANCES_BY_COMPONENT
+      ? expandReferenceWithInstanceComponents(referenceStructure, alignedActualStructure)
+      : referenceStructure;
   const diffResult =
-    shouldDiff && referenceStructure && alignedActualStructure
-      ? diffStructures(alignedActualStructure, referenceStructure, {
+    shouldDiff && expandedReferenceStructure && alignedActualStructure
+      ? diffStructures(alignedActualStructure, expandedReferenceStructure, {
           strict: STRICT_COMPARISON,
           resolveTokenLabel: resolveTokenLabelForDiff,
           resolveColorLabel: resolveTokenLabelFromColor,
@@ -669,6 +678,52 @@ function alignStructurePaths(
     cloned.path = replacePathPrefix(node.path, prefix, newPrefix);
     return cloned;
   });
+}
+
+function expandReferenceWithInstanceComponents(
+  reference: DSStructureNode[],
+  actual: DSStructureNode[],
+): DSStructureNode[] {
+  if (!reference.length || !actual.length) return reference;
+
+  const referenceMap = new Map(reference.map((node) => [node.path, node]));
+  const actualRootPath = actual[0]?.path ?? '';
+  const visited = new Set<string>();
+
+  for (const node of actual) {
+    if (node.type !== 'INSTANCE') continue;
+    if (!node.componentInstance?.componentKey) continue;
+    if (node.path === actualRootPath) continue;
+
+    const componentKey = node.componentInstance.componentKey;
+    const visitKey = `${node.path}::${componentKey}`;
+    if (visited.has(visitKey)) continue;
+    visited.add(visitKey);
+
+    const componentRef = findComponentByKeyOrName(componentKey, node.name ?? '');
+    const instanceStructure = resolveStructure(componentRef, componentKey);
+    if (!instanceStructure || instanceStructure.length === 0) continue;
+
+    const instanceRoot =
+      instanceStructure.find((item) => !item.path.includes(' / '))?.path ??
+      instanceStructure[0].path;
+
+    const aligned =
+      instanceRoot && instanceRoot !== node.path
+        ? instanceStructure.map((refNode) => {
+            const cloned = Object.assign({}, refNode);
+            cloned.path = replacePathPrefix(refNode.path, instanceRoot, node.path);
+            return cloned;
+          })
+        : instanceStructure;
+
+    // Override placeholder nodes with the nested component's own reference structure.
+    for (const refNode of aligned) {
+      referenceMap.set(refNode.path, refNode);
+    }
+  }
+
+  return Array.from(referenceMap.values());
 }
 
 type ThemeMismatchInfo = {

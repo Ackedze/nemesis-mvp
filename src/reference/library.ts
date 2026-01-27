@@ -743,6 +743,112 @@ function parseNumberOrArray(value: string): number | number[] | undefined {
   return Number.isNaN(num) ? undefined : num;
 }
 
+// Normalize Athena-like paint fields to the runtime shape used by diff.
+function normalizeComponentPaints(component: AthenaComponent) {
+  if (!component) return;
+  if (Array.isArray(component.structure)) {
+    for (const node of component.structure) {
+      normalizePaintFields(node);
+    }
+  }
+  if (component.variantStructures) {
+    for (const patches of Object.values(component.variantStructures)) {
+      if (!Array.isArray(patches)) continue;
+      for (const patch of patches) {
+        if (!patch) continue;
+        if (patch.op === 'update') {
+          normalizePaintFields(patch.value);
+        } else if (patch.op === 'add') {
+          normalizePaintFields(patch.node);
+        }
+      }
+    }
+  }
+}
+
+function normalizePaintFields(target: any) {
+  if (!target || typeof target !== 'object') return;
+
+  const fillToken = target.fillToken ?? extractTokenFromPaints(target.fills);
+  const fillColor = extractColorFromPaints(target.fills);
+
+  if (fillToken || fillColor) {
+    target.fill = target.fill ?? {};
+    if (!target.fill.token && fillToken) {
+      target.fill.token = fillToken;
+    }
+    if (!target.fill.color && fillColor) {
+      target.fill.color = fillColor;
+    }
+  }
+
+  const strokeToken = target.strokeToken ?? extractTokenFromPaints(target.strokes);
+  const strokeColor = extractColorFromPaints(target.strokes);
+
+  if (strokeToken || strokeColor || typeof target.strokeWeight === 'number') {
+    target.stroke = target.stroke ?? {};
+    if (!target.stroke.token && strokeToken) {
+      target.stroke.token = strokeToken;
+    }
+    if (!target.stroke.color && strokeColor) {
+      target.stroke.color = strokeColor;
+    }
+    if (
+      target.stroke.weight == null &&
+      typeof target.strokeWeight === 'number'
+    ) {
+      target.stroke.weight = target.strokeWeight;
+    }
+    if (!target.stroke.align && target.strokeAlign) {
+      target.stroke.align = target.strokeAlign;
+    }
+  }
+}
+
+function extractTokenFromPaints(paints: any): string | null {
+  if (!Array.isArray(paints)) return null;
+  for (const paint of paints) {
+    if (!paint || typeof paint !== 'object') continue;
+    const tokenKey =
+      paint.tokenKey ||
+      paint.token ||
+      paint?.boundVariables?.color?.id ||
+      paint?.boundVariables?.color?.variableId ||
+      paint?.boundVariables?.color?.variable?.id ||
+      paint?.boundVariables?.color?.variable?.key;
+    if (tokenKey) return String(tokenKey);
+  }
+  return null;
+}
+
+function extractColorFromPaints(paints: any): string | null {
+  if (!Array.isArray(paints)) return null;
+  for (const paint of paints) {
+    if (!paint || typeof paint !== 'object') continue;
+    if (paint.visible === false) continue;
+    if (paint.type && paint.type !== 'SOLID') continue;
+    const color = paint.color;
+    if (typeof color === 'string') {
+      return color;
+    }
+    if (color && typeof color === 'object') {
+      return formatRgba(color);
+    }
+  }
+  return null;
+}
+
+function formatRgba(color: { r: number; g: number; b: number; a?: number }) {
+  const max = Math.max(color.r, color.g, color.b);
+  const scale = max <= 1 ? 255 : 1;
+  const r = Math.round(color.r * scale);
+  const g = Math.round(color.g * scale);
+  const b = Math.round(color.b * scale);
+  const alpha =
+    typeof color.a === 'number' ? Math.round(color.a * 100) / 100 : 1;
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
 function hydrateCatalogs(modules: AthenaCatalog[]) {
   catalogs = modules;
   partHostMap.clear();
@@ -941,6 +1047,7 @@ export function getHostKeysForPart(partKey: string): string[] {
 }
 
 function prepareComponent(component: AthenaComponent, module: AthenaCatalog) {
+  normalizeComponentPaints(component);
   const role = mapRole(component.role);
   const parentName =
     component.parentComponent?.name ||

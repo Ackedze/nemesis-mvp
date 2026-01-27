@@ -366,6 +366,11 @@ function comparePaint(
   const actualColor = actual?.color ?? null;
   const referenceColor = reference.color ?? null;
 
+  // Prefer exact token ID equality; labels can differ across catalogs or mappings.
+  if (actualToken && referenceToken && actualToken === referenceToken) {
+    return;
+  }
+
   const formatToken = (token: string | null) => {
     if (!token) return null;
     return resolveTokenLabel ? resolveTokenLabel(token) || token : token;
@@ -449,7 +454,34 @@ function compareStroke(
   resolveTokenLabel?: (token: string) => string | null,
   resolveColorLabel?: (color: string) => string | null,
 ) {
-  if (!reference) return;
+  if (!reference) {
+    const actualToken = actual?.token ?? null;
+    const actualColor = actual?.color ?? null;
+    const actualWeight = actual?.weight ?? null;
+    const hasActualStroke =
+      Boolean(actualToken || actualColor) &&
+      typeof actualWeight === 'number' &&
+      actualWeight > 0;
+    if (hasActualStroke) {
+      const formatToken = (token: string | null) => {
+        if (!token) return null;
+        return resolveTokenLabel ? resolveTokenLabel(token) || token : token;
+      };
+      const tokenLabel = formatToken(actualToken);
+      const colorLabel =
+        !tokenLabel && actualColor && resolveColorLabel
+          ? resolveColorLabel(actualColor)
+          : null;
+      const target = tokenLabel
+        ? `token: ${tokenLabel}`
+        : colorLabel
+          ? `token: ${colorLabel}`
+          : actualColor ?? '—';
+      // Reference has no stroke, but actual has one — treat as customization.
+      pushDiff(diffs, actualNode, path, `Обводка: — → ${target}`);
+    }
+    return;
+  }
   comparePaint(
     'обводка',
     path,

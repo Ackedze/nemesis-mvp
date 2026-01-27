@@ -40,6 +40,10 @@
 - UI обновляет счетчики вместе с фильтром «только видимые» — `visibleViews` передаются параллельно `views`, потому что табы рендерят либо весь набор, либо уже предфильтрованные данные.
 - Компоненты, токены и стили загружаются единым пулом справочников, поэтому ссылки в таблице соответствуют источникам из `JSONS-MVP/` после генерации `referenceSourcesMVP.json`.
 - `snapshotNormalizedContext` и `snapshotTree` теперь проставляют флаг `visible` с учётом родителей, чтобы диффы не теряли контекст видимости.
+- Для сравнения заливок/обводок сначала сверяются **token ID**, а уже затем отображаемые лейблы (чтобы избежать ложных диффов при разных неймингах).
+- В diff-пайплайне nested instances сопоставляются с **собственными** reference-структурами по `componentKey`, а не с placeholder-узлами родителя.
+- При отсутствии `stroke` в reference и наличии обводки в actual добавляется diff, чтобы фиксировать "лишнюю" обводку.
+- Патчи `variantStructures` нормализуются: `fillToken/strokeToken` прокладываются в `fill.token`/`stroke.token`, а цвета из `fills/strokes` конвертируются в `rgba(...)`.
 
 ## Списки каталогов
 - Скрипт `scripts/prepareReferences.js` всегда скачивает `JSONS-MVP/referenceSourcesMVP.json` с `https://ackedze.github.io/nemesis-mvp/JSONS-MVP/referenceSourcesMVP.json` и затем синхронизирует эти данные и в `JSONS-MVP/`, и в `src/reference/referenceSources.json`.
