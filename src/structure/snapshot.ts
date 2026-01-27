@@ -36,9 +36,12 @@ export async function snapshotTree(root: SceneNode): Promise<DSStructureNode[]> 
     parentId: number | null,
     parentVisible: boolean,
   ) {
-    const id = nextId++;
     const nodeVisible = getNodeSelfVisible(node);
     const effectiveVisible = parentVisible && nodeVisible;
+    if (!effectiveVisible) {
+      return;
+    }
+    const id = nextId++;
     const snap = await snapshotNode(
       node,
       parentPath,
@@ -99,6 +102,9 @@ export async function snapshotNormalizedContext(
     const path = makePath(parentPath, node.name);
     const nodeVisible = getNodeSelfVisible(node);
     const effectiveVisible = parentVisible && nodeVisible;
+    if (!effectiveVisible) {
+      return;
+    }
     const element: DSNormalizedElement = {
       path,
       type: node.type,

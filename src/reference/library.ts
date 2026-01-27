@@ -319,41 +319,7 @@ function parseNormalizedCatalog(
   if (!elements.length) {
     return null;
   }
-  const rootComponents = elements.filter((el) => el.type === 'COMPONENT');
-  const grouped: AthenaComponent[] = [];
-  const fallbackKey =
-    elements.find((el) => el.componentKey)?.componentKey ?? '';
-
-  if (!rootComponents.length) {
-    grouped.push(
-      buildComponentFromElements(
-        fileName,
-        elements[0]?.path?.split(' / ')[0] ?? fileName,
-        fallbackKey,
-        elements,
-      ),
-    );
-  } else {
-    for (const root of rootComponents) {
-      const rootPath = root.path;
-      const group = elements.filter(
-        (el) => el.path === rootPath || el.path.startsWith(`${rootPath} / `),
-      );
-      grouped.push(
-        buildComponentFromElements(
-          fileName,
-          rootPath.split(' / ')[0] ?? rootPath,
-          root.componentKey ?? fallbackKey,
-          group,
-        ),
-      );
-    }
-  }
-
-  return {
-    meta: { fileName },
-    components: grouped,
-  };
+  return parseNormalizedCatalogFromElements(elements, fileName);
 }
 
 function parseNormalizedJsonCatalog(
@@ -384,25 +350,55 @@ function parseNormalizedCatalogFromElements(
     elements.find((el) => el.componentKey)?.componentKey ?? '';
 
   if (!rootComponents.length) {
-    grouped.push(
-      buildComponentFromElements(
-        fileName,
-        elements[0]?.path?.split(' / ')[0] ?? fileName,
-        fallbackKey,
-        elements,
-      ),
-    );
+    const byRoot = new Map<string, NormalizedElement[]>();
+    for (const element of elements) {
+      const rootPath =
+        element.path?.split(' / ')[0] ?? fileName;
+      const key = element.componentKey ?? fallbackKey;
+      const groupKey = `${rootPath}::${key}`;
+      if (!byRoot.has(groupKey)) {
+        byRoot.set(groupKey, []);
+      }
+      byRoot.get(groupKey)?.push(element);
+    }
+    for (const [groupKey, groupElements] of byRoot.entries()) {
+      const [rootPath, key] = groupKey.split('::');
+      grouped.push(
+        buildComponentFromElements(
+          fileName,
+          rootPath ?? fileName,
+          key ?? fallbackKey,
+          groupElements,
+        ),
+      );
+    }
   } else {
+    const seen = new Set<string>();
     for (const root of rootComponents) {
       const rootPath = root.path;
-      const group = elements.filter(
-        (el) => el.path === rootPath || el.path.startsWith(`${rootPath} / `),
-      );
+      const rootKey = root.componentKey ?? fallbackKey;
+      const groupKey = `${rootPath}::${rootKey}`;
+      if (seen.has(groupKey)) {
+        continue;
+      }
+      seen.add(groupKey);
+      const group = elements.filter((el) => {
+        if (el.path !== rootPath && !el.path.startsWith(`${rootPath} / `)) {
+          return false;
+        }
+        if (!rootKey) {
+          return true;
+        }
+        if (!el.componentKey) {
+          return true;
+        }
+        return el.componentKey === rootKey;
+      });
       grouped.push(
         buildComponentFromElements(
           fileName,
           rootPath.split(' / ')[0] ?? rootPath,
-          root.componentKey ?? fallbackKey,
+          rootKey,
           group,
         ),
       );
