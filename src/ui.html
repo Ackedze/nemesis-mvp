@@ -139,6 +139,54 @@
         max-height: 100%;
         padding-right: 4px;
       }
+      .sidebar-footer {
+        margin-top: auto;
+        padding: 24px 24px 12px 12px;
+        border-top: 1px solid #ececf2;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .filter-toggle {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        color: #111;
+      }
+      .filter-toggle span {
+        flex: 1;
+      }
+      .filter-toggle input {
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        border: 1px solid #111;
+        background: transparent;
+        cursor: pointer;
+        appearance: none;
+        -webkit-appearance: none;
+        position: relative;
+        transition:
+          background 0.15s ease,
+          border-color 0.15s ease;
+      }
+      .filter-toggle input::after {
+        content: '';
+        position: absolute;
+        inset: 4px;
+        border-radius: 50%;
+        background: #fff;
+        opacity: 0;
+        transition: opacity 0.15s ease;
+      }
+      .filter-toggle input:checked {
+        background: #111;
+        border-color: #111;
+      }
+      .filter-toggle input:checked::after {
+        opacity: 1;
+      }
       .main {
         display: flex;
         flex-direction: column;
@@ -446,6 +494,12 @@
       <div class="workspace">
         <aside class="sidebar">
           <div id="tabs"></div>
+          <div class="sidebar-footer">
+            <label class="filter-toggle">
+              <span>Только видимые</span>
+              <input type="checkbox" id="filter-visible" checked />
+            </label>
+          </div>
         </aside>
         <main class="main">
           <section id="gpt-card" class="gpt-card hidden" hidden aria-hidden="true">
@@ -535,9 +589,22 @@
           return current;
         }
 
+        /**
+         * Выбирает основное значение (visible vs raw) для текущего фильтра,
+         * чтобы UI не дублировал логику фильтрации видимости.
+         */
         function resolveViewArray(path) {
-          const value = getValueFromPath(currentResults?.views, path);
-          return Array.isArray(value) ? value : [];
+          const primary = filters.visibleOnly
+            ? currentVisibleViews ?? currentResults?.visibleViews
+            : currentResults?.views;
+          const fallback = filters.visibleOnly
+            ? currentResults?.views
+            : currentVisibleViews ?? currentResults?.visibleViews;
+          const primaryValue = getValueFromPath(primary, path);
+          if (Array.isArray(primaryValue)) return primaryValue;
+          const fallbackValue = getValueFromPath(fallback, path);
+          if (Array.isArray(fallbackValue)) return fallbackValue;
+          return [];
         }
 
         function getTabSource(tabId) {
@@ -570,6 +637,7 @@
 
         let currentTab = 'current';
         let currentResults = null;
+        let currentVisibleViews = null;
         let isScanning = false;
         let catalogsReady = false;
         let catalogsLoading = true;
@@ -589,11 +657,15 @@
         const listContainer = document.getElementById('results');
         const summaryCountEl = document.getElementById('summary-count');
         const toastEl = document.getElementById('toast');
+        const filterVisibleEl = document.getElementById('filter-visible');
         const gptInputEl = document.getElementById('gpt-input');
         const gptFillButton = document.getElementById('gpt-fill-button');
         const gptSubmitButton = document.getElementById('gpt-submit');
         const gptStatusEl = document.getElementById('gpt-status');
         const gptResultEl = document.getElementById('gpt-result');
+        const filters = {
+          visibleOnly: true,
+        };
         let gptRequestInProgress = false;
         let gptHasManualText = false;
 
@@ -623,9 +695,25 @@
           };
         }
 
+        initFilterControls();
         setScanningState(false);
 
         initGptControls();
+
+        /* ========== Инициализация фильтров и событий ======= */
+        /**
+         * Инициализирует UI-фильтры и заставляет список перерисовываться и обновлять бейджи.
+         */
+        function initFilterControls() {
+          if (filterVisibleEl instanceof HTMLInputElement) {
+            filters.visibleOnly = filterVisibleEl.checked;
+            filterVisibleEl.addEventListener('change', () => {
+              filters.visibleOnly = filterVisibleEl.checked;
+              renderList();
+              updateActiveTabClasses();
+            });
+          }
+        }
 
         function initGptControls() {
           if (gptFillButton instanceof HTMLButtonElement) {
@@ -787,7 +875,10 @@
          */
         function prepareChangeDiffs(item) {
           const rawDiffs = Array.isArray(item.diffs) ? item.diffs : [];
-          return dedupeDiffs(rawDiffs.slice());
+          const visibleDiffs = filters.visibleOnly
+            ? rawDiffs.filter((diff) => diff.visible !== false)
+            : rawDiffs.slice();
+          return dedupeDiffs(visibleDiffs);
         }
 
         const TRIVIAL_SEGMENT_TEXTS = new Set(['—', '–', '-', 'ok']);
@@ -1336,6 +1427,7 @@
 
           if (msg.type === 'scan-result') {
             currentResults = msg.payload;
+            currentVisibleViews = msg.payload?.visibleViews ?? null;
             expandedNodes.clear();
             updateSummaryCount(currentResults);
             scanCompleted = true;

@@ -25,6 +25,7 @@ import {
   collectTextNodesFromSelection,
   computeChangesResults,
   describeCustomStyleReasons,
+  filterVisibleEntries,
   TextNodeCollectionOptions,
   type CustomStyleCollectionOptions,
 } from './services/auditViewBuilder';
@@ -272,7 +273,30 @@ async function runAudit() {
     const changesResults = computeChangesResults(relevanceBuckets.current, {
       visibleOnly: false,
     });
+    const visibleChangesResults = computeChangesResults(
+      relevanceBuckets.current,
+      { visibleOnly: true },
+    );
     counts.changes = changesResults.length;
+    const visibleViews = {
+      relevance: {
+        current: filterVisibleEntries(relevanceBuckets.current),
+        deprecated: filterVisibleEntries(relevanceBuckets.deprecated),
+        update: filterVisibleEntries(relevanceBuckets.update),
+        unknown: filterVisibleEntries(relevanceBuckets.unknown),
+      },
+      theme: {
+        ok: filterVisibleEntries(themeBuckets.ok),
+        error: filterVisibleEntries(themeBuckets.error),
+      },
+      local: filterVisibleEntries(localLibraryItems),
+      textNodes: filterVisibleEntries(missingTokenTextNodes),
+      textAll: filterVisibleEntries(allTextNodes),
+      customStyles: filterVisibleEntries(customStyleEntries),
+      detached: filterVisibleEntries(detachedEntries),
+      presets: filterVisibleEntries(presetItems),
+      changes: visibleChangesResults,
+    };
 
     figma.ui.postMessage({
       type: 'scan-result',
@@ -295,6 +319,7 @@ async function runAudit() {
           detached: detachedEntries,
           presets: presetItems,
         },
+        visibleViews,
         changes: changesResults,
       },
     });
