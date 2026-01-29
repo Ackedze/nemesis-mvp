@@ -4,7 +4,7 @@ export type ReferenceCatalogSource = {
   url: string;
 };
 
-export type RemoteReferenceCatalogEntry = {
+type RemoteReferenceCatalogEntry = {
   id?: string;
   fileName: string;
   path: string;
@@ -22,6 +22,7 @@ export function buildReferenceCatalogSources(
   payload: RemoteReferenceCatalogList,
 ): ReferenceCatalogSource[] {
   const baseUrl = (payload.baseUrl ?? '').trim();
+  
   return (payload.catalogs ?? []).map((entry, index) => ({
     id: entry.id ?? `catalog${index}`,
     fileName: entry.fileName,

@@ -79,25 +79,35 @@ export async function snapshotNormalizedContext(
     activeComponentKey: string | null,
     parentVisible: boolean,
   ) {
+    const nodeVisible = getNodeSelfVisible(node);
+
+    if (!nodeVisible) {
+      return 
+    }
+
     let nextComponentKey = activeComponentKey;
+
     if (node.type === 'INSTANCE') {
       const inst = node as InstanceNode;
+
       const mainComponent =
         typeof inst.getMainComponentAsync === 'function'
           ? await inst.getMainComponentAsync()
           : inst.mainComponent;
+
       if (mainComponent?.key) {
         nextComponentKey = mainComponent.key;
       }
+
     } else if (node.type === 'COMPONENT' && 'key' in node) {
       const key = (node as ComponentNode).key;
+
       if (key) {
         nextComponentKey = key;
       }
     }
 
     const path = makePath(parentPath, node.name);
-    const nodeVisible = getNodeSelfVisible(node);
     const effectiveVisible = parentVisible && nodeVisible;
     const element: DSNormalizedElement = {
       path,
@@ -159,22 +169,17 @@ export async function snapshotNormalizedContext(
 /**
  * Базовый снимок одного узла: собирает layout, paint, radius, эффекты и связанную компоненту.
  */
-async function snapshotNode(
+export async function snapshotNode(
   node: SceneNode,
   parentPath: string,
-  parentId: number | null,
-  id: number,
-  visible: boolean,
 ): Promise<DSStructureNode> {
   const path = makePath(parentPath, node.name);
-  const snap: DSStructureNode = {
-    id,
+
+  const snap: Partial<DSStructureNode> = {
     nodeId: node.id,
-    parentId,
     path,
     type: node.type,
     name: node.name,
-    visible,
   };
 
   const styles = extractStyles(node);
@@ -311,8 +316,11 @@ async function extractInstance(
 
 function extractText(node: SceneNode): DSTextContent | undefined {
   if (node.type !== 'TEXT') return undefined;
+
   const t = node as TextNode;
+
   const result: DSTextContent = {};
+
   let hasData = false;
 
   if (typeof t.characters === 'string') {
@@ -324,8 +332,9 @@ function extractText(node: SceneNode): DSTextContent | undefined {
     if (t.lineHeight.unit === 'PIXELS') {
       result.lineHeight = t.lineHeight.value;
     } else {
-      result.lineHeight = `${t.lineHeight.unit}(${t.lineHeight.value})`;
+      result.lineHeight = `${t.lineHeight.unit}`;
     }
+
     hasData = true;
   }
 
@@ -340,7 +349,7 @@ function extractText(node: SceneNode): DSTextContent | undefined {
   }
 
   if (t.textCase && t.textCase !== 'ORIGINAL') {
-    result.case = t.textCase;
+    result.case = t.textCase.toString();
     hasData = true;
   }
 
@@ -505,6 +514,7 @@ function extractNormalizedLayout(
   node: SceneNode,
 ): DSNormalizedElement['layout'] | undefined {
   const layout: DSNormalizedElement['layout'] = {};
+
   if (
     'layoutMode' in node &&
     (node as AutoLayoutMixin).layoutMode &&
@@ -522,6 +532,7 @@ function extractNormalizedLayout(
   }
 
   const radius = extractRadius(node);
+
   if (typeof radius === 'number') {
     layout.radius = radius;
   } else if (radius) {
@@ -538,10 +549,13 @@ function extractNormalizedLayout(
 
 function extractEffects(node: SceneNode): DSEffect[] | undefined {
   if (!('effects' in node)) return undefined;
+
   const effects = (node as any).effects;
+
   if (!effects || effects === figma.mixed || effects.length === 0) return undefined;
 
   const result: DSEffect[] = [];
+  
   for (const e of effects) {
     result.push({
       type: e.type,
