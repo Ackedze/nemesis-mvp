@@ -756,7 +756,8 @@ function normalizePaintFields(target: any) {
     }
   }
 
-  const strokeToken = target.strokeToken ?? extractTokenFromPaints(target.strokes);
+  const strokeToken =
+    target.strokeToken ?? extractTokenFromPaints(target.strokes);
   const strokeColor = extractColorFromPaints(target.strokes);
 
   if (strokeToken || strokeColor || typeof target.strokeWeight === 'number') {
