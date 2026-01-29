@@ -408,6 +408,14 @@ function mergeNormalizedComponents(
     if (match.name && component.name !== match.name) {
       component.name = match.name;
     }
+
+    if (
+      Array.isArray((match as any).structure) &&
+      (match as any).structure.length > 0
+    ) {
+      component.structure = (match as any).structure as DSStructureNode[];
+    }
+
     if (match.variants && match.variants.length) {
       component.variants = match.variants
         .filter((variant) => variant && variant.key && variant.name)
