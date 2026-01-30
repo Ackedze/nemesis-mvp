@@ -1,4 +1,4 @@
-import type { RelevanceStatus, AuditItem, ThemeStatus, CustomStyleEntry, DetachedEntry } from './types/audit'
+import type { RelevanceStatus, AuditItem, ThemeStatus, CustomStyleEntry, DetachedEntry, TextNodeEntry } from './types/audit'
 
 export interface CheckState {
     relevanceBuckets: Record<RelevanceStatus, AuditItem[]>
@@ -8,6 +8,8 @@ export interface CheckState {
     detachedEntries: DetachedEntry[]
     customStyleEntries : CustomStyleEntry[]
     totalItems: number;
+    textNodes: TextNodeEntry[];
+    textAll: TextNodeEntry[];
 }
 
 export const createCheckState = (): CheckState => {
@@ -26,6 +28,8 @@ export const createCheckState = (): CheckState => {
           presetItems: [],
           detachedEntries: [],
           customStyleEntries: [],
-          totalItems: 0
+          totalItems: 0,
+          textNodes: [],
+          textAll: []
     }
 }

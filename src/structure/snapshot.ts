@@ -36,6 +36,10 @@ export async function snapshotTree(root: SceneNode): Promise<DSStructureNode[]> 
     parentId: number | null,
     parentVisible: boolean,
   ) {
+    if (!node.visible) {
+      return
+    }
+
     const id = nextId++;
     const nodeVisible = getNodeSelfVisible(node);
     const effectiveVisible = parentVisible && nodeVisible;
@@ -175,57 +179,23 @@ export async function snapshotNode(
 ): Promise<DSStructureNode> {
   const path = makePath(parentPath, node.name);
 
-  const snap: Partial<DSStructureNode> = {
+  const snap: DSStructureNode = {
     nodeId: node.id,
     path,
     type: node.type,
     name: node.name,
+    styles: extractStyles(node),
+    fill: extractFillInfo(node),
+    stroke: extractStrokeInfo(node),
+    layout: extractLayout(node),
+    opacity: 'opacity' in node ? node.opacity : 1,
+    opacityToken: getBoundVariableId(node.boundVariables, 'opacity'),
+    componentInstance: await extractInstance(node),
+    text: extractText(node),
+    radius: extractRadius(node),
+    radiusToken: getBoundVariableId(node.boundVariables, 'cornerRadius'),
+    effects: extractEffects(node),
   };
-
-  const styles = extractStyles(node);
-  if (styles) {
-    snap.styles = styles;
-  }
-
-  const fillInfo = extractFillInfo(node);
-  if (fillInfo) {
-    snap.fill = fillInfo;
-  }
-
-  const strokeInfo = extractStrokeInfo(node);
-  if (strokeInfo) {
-    snap.stroke = strokeInfo;
-  }
-
-  const layout = extractLayout(node);
-  if (layout) {
-    snap.layout = layout;
-  }
-
-  if ('opacity' in node && typeof (node as any).opacity === 'number') {
-    snap.opacity = (node as any).opacity;
-  }
-  const bound = (node as any).boundVariables;
-  const opacityToken = getBoundVariableId(bound, 'opacity');
-  if (opacityToken) {
-    snap.opacityToken = opacityToken;
-  }
-
-  const inst = await extractInstance(node);
-  if (inst) snap.componentInstance = inst;
-
-  const text = extractText(node);
-  if (text) snap.text = text;
-
-  const radius = extractRadius(node);
-  if (typeof radius !== 'undefined') snap.radius = radius;
-  const radiusToken = getBoundVariableId(bound, 'cornerRadius');
-  if (radiusToken) {
-    snap.radiusToken = radiusToken;
-  }
-
-  const effects = extractEffects(node);
-  if (effects && effects.length > 0) snap.effects = effects;
 
   return snap;
 }
@@ -486,28 +456,33 @@ function getBoundVariableId(boundVariables: any, key: string): string | null {
   return candidate ? String(candidate) : null;
 }
 
-function extractRadius(node: SceneNode): DSRadii | undefined {
-  if ('cornerRadius' in node) {
-    if (typeof (node as CornerMixin).cornerRadius === 'number' && (node as CornerMixin).cornerRadius !== figma.mixed) {
-      return (node as CornerMixin).cornerRadius;
-    }
-    const mixin = node as CornerMixin & IndividualCornerMixin;
-    if (
-      typeof mixin.topLeftRadius === 'number' &&
-      typeof mixin.topRightRadius === 'number' &&
-      typeof mixin.bottomRightRadius === 'number' &&
-      typeof mixin.bottomLeftRadius === 'number'
-    ) {
-      const values: DSRadiiValues = {
-        topLeft: mixin.topLeftRadius,
-        topRight: mixin.topRightRadius,
-        bottomRight: mixin.bottomRightRadius,
-        bottomLeft: mixin.bottomLeftRadius,
-      };
-      return values;
-    }
+function extractRadius(node: SceneNode): DSRadii | null {
+  if ('cornerRadius' in node === false) {
+    return null;
   }
-  return undefined;
+
+  if (typeof node.cornerRadius === 'number') {
+    return node.cornerRadius;
+  }
+
+  const mixin = node as CornerMixin & RectangleCornerMixin;
+
+  if (
+    typeof mixin.topLeftRadius === 'number' &&
+    typeof mixin.topRightRadius === 'number' &&
+    typeof mixin.bottomRightRadius === 'number' &&
+    typeof mixin.bottomLeftRadius === 'number'
+  ) {
+    const values: DSRadiiValues = {
+      topLeft: mixin.topLeftRadius,
+      topRight: mixin.topRightRadius,
+      bottomRight: mixin.bottomRightRadius,
+      bottomLeft: mixin.bottomLeftRadius,
+    };
+    return values;
+  }
+
+  return null
 }
 
 function extractNormalizedLayout(

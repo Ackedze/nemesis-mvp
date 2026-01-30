@@ -9,11 +9,12 @@ import {
   getTokenCatalogs,
   primaryCatalog,
   reportMissingReference,
+  resolveStructure,
 } from './reference/library';
 import {LibraryComponent} from './reference/libraryTypes'
-import { snapshotNode } from './structure/snapshot';
+import {  snapshotTree } from './structure/snapshot';
 import { diffStructures } from './structure/diff';
-import type { DSNormalizedSnapshot, DSStructureNode } from './types/structures';
+import type { DSStructureNode } from './types/structures';
 import type { AuditItem, RelevanceStatus, ThemeStatus } from './types/audit';
 import { tabDefinitions } from './config/tabs';
 import { eyeClosedIcon, eyeOpenIcon } from './icons';
@@ -22,10 +23,11 @@ import {
   collectCustomStyles,
   collectDetachedEntry,
   computeChangesResults,
+  describeTextNode,
+  TextNodeCollectionOptions,
   type CustomStyleCollectionOptions,
 } from './services/auditViewBuilder';
 import { CheckState, createCheckState } from './create-check-state';
-import { getComponentKeyWithCache, initCache, saveCacheToStorage } from './services/figmaCache';
 
 figma.showUI(__html__, { width: 800, height: 860 });
 figma.ui.postMessage({
@@ -39,9 +41,6 @@ figma.ui.postMessage({
 });
 
 startCatalogPreload();
-let instancesCache: Map<string, string>;
-
-(async () => initCache())().then((result) => instancesCache = result);
 
 figma.ui.onmessage = (msg) => {
   if (msg.type === 'ping') {
@@ -74,10 +73,6 @@ figma.ui.onmessage = (msg) => {
     return;
   }
 };
-
-figma.on('close', async () => {
-  await saveCacheToStorage(instancesCache)
-})
 
 let scanInProgress = false;
 let cancelRequested = false;
@@ -190,28 +185,6 @@ async function runAudit() {
       return;
     }
 
-    // // ??? Зачем это нужно
-    // const normalizedSnapshots = [];
-    
-    // for (const node of selection) {
-    //   try {
-    //     const start = getTimestamp();
-    //     console.log('start snapshot', getTimestamp())
-    //     const normalized = await snapshotNormalizedContext(node);
-    //     console.log('end snapshot', (getTimestamp() - start).toFixed(1))
-    //     console.log('[Nemesis] normalized snapshot', normalized);
-
-    //     normalizedSnapshots.push(normalized);
-    //   } catch (error) {
-    //     console.warn('[Nemesis] normalized snapshot failed', error);
-    //   }
-    // }
-
-    // figma.ui.postMessage({
-    //   type: 'normalized-snapshot-ready',
-    //   payload: normalizedSnapshots.length ? normalizedSnapshots : null,
-    // });
-
     const checkState = createCheckState()
 
     const referenceStructureCache = new Map<string, DSStructureNode[] | null>();
@@ -220,7 +193,12 @@ async function runAudit() {
       tokenLabelMap: tokenLabelMap ?? new Map(),
     };
 
-    await collectTargets(selection, checkState, referenceStructureCache, instancesCache, customStyleReasonOptions );
+    const textNodeOptions: TextNodeCollectionOptions = {
+      tokenLabelMap: tokenLabelMap ?? new Map(),
+      tokenColorMap: tokenColorMap ?? new Map(),
+    };
+
+    await collectTargets(selection, checkState, referenceStructureCache, customStyleReasonOptions, textNodeOptions );
     
     if (checkState.totalItems === 0) {
       const message = 'Компоненты или инстансы в выделении не найдены.';
@@ -234,37 +212,28 @@ async function runAudit() {
       return;
     }
 
-    // const textNodeOptions: TextNodeCollectionOptions = {
-    //   tokenLabelMap: tokenLabelMap ?? new Map(),
-    //   tokenColorMap: tokenColorMap ?? new Map(),
-    // };
-
-    // // `textAll` продолжает собирать все текстовые узлы для панели GPT, даже без отдельного таба.
-    // const allTextNodes = collectTextNodesFromSelection(selection, textNodeOptions);
-
-    // const missingTokenTextNodes = allTextNodes.filter(
-    //   (entry) => !entry.usesToken && !entry.usesStyle,
-    // );
+    const changesResults = computeChangesResults(checkState.relevanceBuckets.current);
 
     const counts = {
       current: checkState.relevanceBuckets.current.length,
       deprecated: checkState.relevanceBuckets.deprecated.length,
       update: checkState.relevanceBuckets.update.length,
       themeError: checkState.themeBuckets.error.length,
+      textNodes: checkState.textNodes.length,
+      textAll: checkState.textAll.length,
       local: checkState.localLibraryItems.length,
       detached: checkState.detachedEntries,
-      changes: 0,
+      changes: changesResults.length,
     };
-
-    const changesResults = computeChangesResults(checkState.relevanceBuckets.current);
-
-    counts.changes = changesResults.length;
+    
     const visibleViews = {
       relevance: checkState.relevanceBuckets,
       theme: checkState.themeBuckets,
       local: checkState.localLibraryItems,
       customStyles: checkState.customStyleEntries,
       detached: checkState.detachedEntries,
+      textNodes: checkState.textNodes.length,
+      textAll: checkState.textAll.length,
       presets: checkState.presetItems,
       changes: changesResults,
     };
@@ -280,14 +249,7 @@ async function runAudit() {
           selectionNames: selection.map((node) => node.name),
           catalogName: primaryCatalog.name,
         },
-        views: {
-          relevance: checkState.relevanceBuckets,
-          theme: checkState.themeBuckets,
-          local: checkState.localLibraryItems,
-          customStyles: checkState.customStyleEntries,
-          detached: checkState.detachedEntries,
-          presets: checkState.presetItems,
-        },
+        views: visibleViews,
         visibleViews,
         changes: changesResults,
       },
@@ -331,8 +293,8 @@ async function collectTargets(
   selection: readonly SceneNode[], 
   checkState: CheckState, 
   referenceStructureCache: Map<string, DSStructureNode[] | null>,
-  instancesCache: Map<string, string>,
-  customStyleReasonOptions: CustomStyleCollectionOptions
+  customStyleReasonOptions: CustomStyleCollectionOptions,
+  textOptions: TextNodeCollectionOptions
 ) {
   const visit = async (node: SceneNode): Promise<void> => {
       if (!node.visible) {
@@ -340,7 +302,7 @@ async function collectTargets(
       }
 
       if (node.type === 'INSTANCE' || node.type === 'COMPONENT') {
-        const item = await classifyNode(node, referenceStructureCache, instancesCache);
+        const item = await classifyNode(node, referenceStructureCache);
 
         if (item) {
           checkState.totalItems++;
@@ -382,6 +344,18 @@ async function collectTargets(
           }
       }
 
+      if (node.type === 'TEXT') {
+        const item = describeTextNode(node, textOptions)
+
+        if (item) {
+          checkState.textAll.push(item)
+
+          if (!item.usesStyle && !item.usesToken) {
+            checkState.textNodes.push(item)
+          }
+        }
+      }
+
       if ('children' in node && node.children.length > 0) {
         for (const child of node.children) {
           await visit(child as SceneNode);
@@ -401,7 +375,6 @@ async function collectTargets(
 async function classifyNode(
   node: SceneNode,
   referenceStructureCache: Map<string, DSStructureNode[] | null>,
-  instancesCache: Map<string, string>
 ): Promise<AuditItem | null> {
   const nodeSegments = buildNodeSegments(node);
 
@@ -414,7 +387,7 @@ async function classifyNode(
 
   const pageName = getPageName(node);
   const fullPath = buildNodePath(node);
-  const componentKey = await getComponentKey(node, instancesCache);
+  const componentKey = await getComponentKey(node);
   const ref = componentKey ? findComponent(componentKey): null;
 
   if (!componentKey || !ref) {
@@ -440,62 +413,59 @@ async function classifyNode(
 
   const comparisonIssues: string[] = [];
 
-  // let referenceStructure = getReferenceStructureCached(
-  //   ref,
-  //   componentKey,
-  //   referenceStructureCache,
-  // );
-  
-  let referenceStructure = ref.variantStructures?.[componentKey]
-    .filter((v) => v.op === 'update')
-    .reduce<DSStructureNode>((acc, item) => Object.assign(acc, item.value), {} as DSStructureNode) ?? null
+  let referenceStructure = getReferenceStructureCached(
+    ref,
+    componentKey,
+    referenceStructureCache,
+  );
 
-  if (!referenceStructure && Array.isArray(ref.variants) && ref.variants.length) {
-
+  if (ref && componentKey && Array.isArray(ref.variants) && ref.variants.length) {
     const variant = ref.variants.find((item) => item?.key === componentKey);
-
     if (!variant) {
       comparisonIssues.push(
         `Вариант ${componentKey} не найден в каталоге для «${ref.name ?? node.name}»`,
       );
-
       referenceStructure = null;
-    } else if (!referenceStructure && !ref.variantStructures || !ref.variantStructures?.[componentKey]) {
+    } else if (!ref.variantStructures || !ref.variantStructures[componentKey]) {
       comparisonIssues.push(
         `Нет variantStructures для «${variant.name ?? componentKey}» (${ref.name ?? node.name})`,
       );
-
       referenceStructure = null;
     }
   }
-
   const needsDiff = Boolean(referenceStructure);
-
   const instanceHasOverrides =
     node.type === 'INSTANCE' && hasInstanceOverrides(node as InstanceNode);
-
   const shouldDiff =
-    needsDiff && (ref.status !== 'current' || instanceHasOverrides);
-
+    needsDiff && (ref?.status !== 'current' || instanceHasOverrides);
   const actualStructure =
-    shouldDiff && referenceStructure ? await snapshotNode(node, fullPath) : null;
+    shouldDiff && referenceStructure ? await snapshotTree(node) : null;
+  const alignedActualStructure =
+    referenceStructure && actualStructure
+      ? alignStructurePaths(actualStructure, referenceStructure)
+      : actualStructure;
+  const expandedReferenceStructure =
+    shouldDiff &&
+    referenceStructure &&
+    alignedActualStructure &&
+    COMPARE_NESTED_INSTANCES_BY_COMPONENT
+      ? expandReferenceWithInstanceComponents(referenceStructure, alignedActualStructure)
+      : referenceStructure;
 
   const diffResult =
-    shouldDiff && referenceStructure && actualStructure
-      ? diffStructures(actualStructure, referenceStructure, {
+    shouldDiff && expandedReferenceStructure && alignedActualStructure
+      ? diffStructures(alignedActualStructure, expandedReferenceStructure, {
           strict: STRICT_COMPARISON,
           resolveTokenLabel: resolveTokenLabelForDiff,
           resolveColorLabel: resolveTokenLabelFromColor,
           resolveStyleLabel: resolveStyleLabelForDiff,
         })
       : { diffs: [], issues: [] };
-
   if (diffResult.issues.length) {
     comparisonIssues.push(...diffResult.issues);
   }
 
-  const { diffs } = diffResult;
-
+  const diffs = diffResult.diffs;
   if (comparisonIssues.length) {
     console.warn('[Nemesis] comparison issues', {
       nodeId: node.id,
@@ -539,9 +509,10 @@ async function classifyNode(
   };
 }
 
-async function getComponentKey(node: SceneNode, instancesCache: Map<string, string>): Promise<string | null> {
+async function getComponentKey(node: SceneNode): Promise<string | null> {
   if (node.type === 'INSTANCE') {
-    return await getComponentKeyWithCache(node, instancesCache);
+    const mainComponent = await node.getMainComponentAsync();
+    return mainComponent ? mainComponent.key : null;
   }
 
   if (node.type === 'COMPONENT') {
@@ -603,6 +574,33 @@ async function focusNode(nodeId: string | undefined) {
   }
 }
 
+function getReferenceStructure(
+  ref: LibraryComponent | null | undefined,
+  variantKey: string | null,
+) {
+  if (!ref) return null;
+  const structure = resolveStructure(ref, variantKey);
+  if (structure && structure.length > 0) {
+    return structure;
+  }
+  return null;
+}
+
+function getReferenceStructureCached(
+  ref: LibraryComponent | null | undefined,
+  variantKey: string | null,
+  cache: Map<string, DSStructureNode[] | null>,
+): DSStructureNode[] | null {
+  if (!ref) return null;
+  const cacheKey = `${ref.key ?? ref.displayName ?? 'unknown'}:${variantKey ?? 'default'}`;
+  if (cache.has(cacheKey)) {
+    return cache.get(cacheKey) ?? null;
+  }
+  const structure = getReferenceStructure(ref, variantKey);
+  cache.set(cacheKey, structure);
+  return structure;
+}
+
 function buildNodeSegments(node: SceneNode): PathSegment[] {
   const segments: PathSegment[] = [];
 
@@ -639,6 +637,74 @@ function normalizeRelevanceStatus(
     default:
       return 'unknown';
   }
+}
+
+function alignStructurePaths(
+  actual: DSStructureNode[],
+  reference: DSStructureNode[],
+): DSStructureNode[] {
+  if (actual.length === 0 || reference.length === 0) return actual;
+  const actualRoot = actual[0].path;
+  const referenceRoot =
+    reference.find((node) => !node.path.includes(' / '))?.path ??
+    reference[0].path;
+  if (!actualRoot || !referenceRoot || actualRoot === referenceRoot) {
+    return actual;
+  }
+
+  const prefix = actualRoot;
+  const newPrefix = referenceRoot;
+  return actual.map((node) => {
+    const cloned = Object.assign({}, node);
+    cloned.path = replacePathPrefix(node.path, prefix, newPrefix);
+    return cloned;
+  });
+}
+
+function expandReferenceWithInstanceComponents(
+  reference: DSStructureNode[],
+  actual: DSStructureNode[],
+): DSStructureNode[] {
+  if (!reference.length || !actual.length) return reference;
+
+  const referenceMap = new Map(reference.map((node) => [node.path, node]));
+  const actualRootPath = actual[0]?.path ?? '';
+  const visited = new Set<string>();
+
+  for (const node of actual) {
+    if (node.type !== 'INSTANCE') continue;
+    if (!node.componentInstance?.componentKey) continue;
+    if (node.path === actualRootPath) continue;
+
+    const componentKey = node.componentInstance.componentKey;
+    const visitKey = `${node.path}::${componentKey}`;
+    if (visited.has(visitKey)) continue;
+    visited.add(visitKey);
+
+    const componentRef = findComponent(componentKey);
+    const instanceStructure = resolveStructure(componentRef, componentKey);
+    if (!instanceStructure || instanceStructure.length === 0) continue;
+
+    const instanceRoot =
+      instanceStructure.find((item) => !item.path.includes(' / '))?.path ??
+      instanceStructure[0].path;
+
+    const aligned =
+      instanceRoot && instanceRoot !== node.path
+        ? instanceStructure.map((refNode) => {
+            const cloned = Object.assign({}, refNode);
+            cloned.path = replacePathPrefix(refNode.path, instanceRoot, node.path);
+            return cloned;
+          })
+        : instanceStructure;
+
+    // Override placeholder nodes with the nested component's own reference structure.
+    for (const refNode of aligned) {
+      referenceMap.set(refNode.path, refNode);
+    }
+  }
+
+  return Array.from(referenceMap.values());
 }
 
 type ThemeMismatchInfo = {
@@ -692,6 +758,15 @@ function hasLockSymbol(component: LibraryComponent): boolean {
     }
   }
   return false;
+}
+
+function replacePathPrefix(path: string, from: string, to: string): string {
+  if (path === from) return to;
+  const needle = `${from} / `;
+  if (path.startsWith(needle)) {
+    return `${to} / ${path.slice(needle.length)}`;
+  }
+  return path;
 }
 
 /**

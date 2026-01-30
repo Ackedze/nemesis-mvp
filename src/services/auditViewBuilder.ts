@@ -177,7 +177,7 @@ export function computeChangesResults(
   });
 }
 
-function describeTextNode(
+export function describeTextNode(
   node: TextNode,
   options: TextNodeCollectionOptions,
 ): TextNodeEntry {

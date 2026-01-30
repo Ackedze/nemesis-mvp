@@ -14,39 +14,42 @@ type DiffResult = {
 };
 
 export function diffStructures(
-  actual: DSStructureNode,
-  reference: DSStructureNode,
-  options: {
-    strict: boolean;
+  actual: DSStructureNode[],
+  reference: DSStructureNode[],
+  options?: {
+    strict?: boolean;
     resolveTokenLabel?: (token: string) => string | null;
     resolveColorLabel?: (color: string) => string | null;
     resolveStyleLabel?: (styleKey: string) => string | null;
   },
 ): DiffResult {
   const diffs: DiffEntry[] = [];
-
   const issueSet = new Set<string>();
+  const actualMap = new Map(actual.map((node) => [node.path, node]));
+  const referenceMap = new Map(reference.map((node) => [node.path, node]));
+  const strict = options?.strict ?? false;
+  const resolveTokenLabel = options?.resolveTokenLabel;
+  const resolveColorLabel = options?.resolveColorLabel;
+  const resolveStyleLabel = options?.resolveStyleLabel;
 
-  const {
-    resolveTokenLabel, 
-    resolveColorLabel, 
-    resolveStyleLabel,
-    strict
-  } = options
+  for (const [path, ref] of referenceMap.entries()) {
+    const node = actualMap.get(path);
+    if (!node) continue;
 
-  compareNode(
-    reference.path,
-    actual,
-    reference,
-    diffs,
-    issueSet,
-    strict,
-    resolveTokenLabel,
-    resolveColorLabel,
-    resolveStyleLabel,
-  );
+    compareNode(
+      path,
+      node,
+      ref,
+      diffs,
+      issueSet,
+      strict,
+      resolveTokenLabel,
+      resolveColorLabel,
+      resolveStyleLabel,
+    );
+  }
 
-  return { diffs, issues: [...issueSet] };
+  return { diffs, issues: Array.from(issueSet.values()) };
 }
 
 function compareNode(
@@ -150,7 +153,6 @@ function compareNode(
     actual.fill,
     reference.fill,
     diffs,
-    
     issueSet,
     strict,
     resolveTokenLabel,
@@ -163,7 +165,6 @@ function compareNode(
     actual.stroke,
     reference.stroke,
     diffs,
-    
     issueSet,
     strict,
     resolveTokenLabel,
@@ -387,7 +388,7 @@ function comparePaint(
       return;
     }
     
-    if (actualColor) {
+    if (actualColor && referenceTokenLabel) {
       pushDiff(
         diffs,
         actualNode,
