@@ -14,6 +14,11 @@ import type {
   LibraryCatalog,
   LibraryComponent,
   LibraryStatus,
+  NormalizedElement,
+  NormalizedJsonCatalog,
+  NormalizedJsonComponent,
+  StyleCatalog,
+  TokenCatalog,
 } from './libraryTypes';
 import type {
   DSStructureNode,
@@ -26,6 +31,7 @@ const styleCatalogs: StyleCatalog[] = [];
 const partHostMap = new Map<string, Set<string>>();
 const corporateNameIndex = new Map<string, LibraryComponent>();
 let catalogSources: ReferenceCatalogSource[] | null = null;
+
 const catalogLoadState: {
   ready: boolean;
   promise: Promise<void> | null;
@@ -33,6 +39,7 @@ const catalogLoadState: {
   ready: false,
   promise: null,
 };
+
 const missingReferenceLog = new Set<string>();
 
 export function areReferenceCatalogsReady(): boolean {
@@ -43,6 +50,7 @@ export async function ensureReferenceCatalogsLoaded(): Promise<void> {
   if (catalogLoadState.ready) {
     return;
   }
+
   if (!catalogLoadState.promise) {
     catalogLoadState.promise = loadAllCatalogs().finally(() => {
       catalogLoadState.promise = null;
@@ -53,13 +61,18 @@ export async function ensureReferenceCatalogsLoaded(): Promise<void> {
 
 async function loadAllCatalogs(): Promise<void> {
   const sources = await ensureCatalogSourceList();
+
   const componentSources = sources.filter(
     (source) => !isTokenCatalogSource(source) && !isStyleCatalogSource(source),
   );
+
   const modules = await Promise.all(componentSources.map(fetchCatalogModule));
+
   hydrateCatalogs(modules);
+
   await loadTokenCatalogs(sources.filter(isTokenCatalogSource));
   await loadStyleCatalogs(sources.filter(isStyleCatalogSource));
+
   catalogLoadState.ready = true;
 }
 
@@ -67,20 +80,29 @@ async function ensureCatalogSourceList(): Promise<ReferenceCatalogSource[]> {
   if (catalogSources) {
     return catalogSources;
   }
+
   try {
     const response = await requestCatalogSource(referenceCatalogListUrl);
+
     const payload = JSON.parse(response);
+
     console.log('[Nemesis] reference sources list loaded', {
       url: referenceCatalogListUrl,
       baseUrl: payload?.baseUrl ?? '',
       count: payload?.catalogs?.length ?? 0,
     });
+
     catalogSources = buildReferenceCatalogSources(payload);
+
     return catalogSources;
   } catch (error) {
+
     console.error('Failed to load reference catalog list', error);
+
     const fallback = fallbackCatalogList as RemoteReferenceCatalogList;
+
     catalogSources = buildReferenceCatalogSources(fallback);
+
     return catalogSources;
   }
 }
@@ -90,20 +112,27 @@ async function fetchCatalogModule(
 ): Promise<AthenaCatalog> {
   try {
     const response = await requestCatalogSource(source.url);
+
     console.log('[Nemesis] catalog fetched', {
       fileName: source.fileName,
       url: source.url,
       bytes: response.length,
     });
+
     reportCatalogLoaded(source.fileName, response.length);
+
     return parseCatalogPayload(response, source.fileName);
+
   } catch (error) {
     console.error(`Failed to load catalog ${source.fileName}`, error);
+
     const message =
       error && typeof error === 'object' && 'message' in error
         ? String((error as any).message)
         : String(error ?? 'Unknown error');
+
     logCatalogEvent(source, `failed: ${message}`);
+
     throw error;
   }
 }
@@ -118,17 +147,22 @@ function isStyleCatalogSource(source: ReferenceCatalogSource): boolean {
 
 function parseCatalogPayload(raw: string, fileName: string): AthenaCatalog {
   const trimmed = raw.trim();
+
   if (!trimmed) {
     throw new Error('Empty catalog payload');
   }
+
   try {
     const parsed = JSON.parse(trimmed);
+    
     if (isNormalizedJsonCatalog(parsed)) {
       return parseNormalizedJsonCatalog(parsed, fileName);
     }
+
     if (isAthenaCatalog(parsed)) {
       return parsed as AthenaCatalog;
     }
+
   } catch (error) {
     if (!trimmed.startsWith('DS_CONTEXT:')) {
       throw error;
@@ -136,6 +170,7 @@ function parseCatalogPayload(raw: string, fileName: string): AthenaCatalog {
   }
 
   const parsed = parseNormalizedCatalog(trimmed, fileName);
+
   if (!parsed) {
     throw new Error('Unsupported normalized catalog format');
   }
@@ -146,16 +181,21 @@ async function loadTokenCatalogs(
   sources: ReferenceCatalogSource[],
 ): Promise<void> {
   tokenCatalogs.length = 0;
+
   for (const source of sources) {
     try {
       const raw = await requestCatalogSource(source.url);
+
       console.log('[Nemesis] token catalog fetched', {
         fileName: source.fileName,
         url: source.url,
         bytes: raw.length,
       });
+
       reportCatalogLoaded(source.fileName, raw.length);
+
       const data = JSON.parse(raw);
+
       tokenCatalogs.push({
         meta: data.meta,
         collections: Array.isArray(data.collections) ? data.collections : [],
@@ -165,6 +205,7 @@ async function loadTokenCatalogs(
         error && typeof error === 'object' && 'message' in error
           ? String((error as any).message)
           : String(error ?? 'Unknown error');
+
       logCatalogEvent(source, `failed: ${message}`);
     }
   }
@@ -174,25 +215,32 @@ async function loadStyleCatalogs(
   sources: ReferenceCatalogSource[],
 ): Promise<void> {
   styleCatalogs.length = 0;
+
   for (const source of sources) {
     try {
       const raw = await requestCatalogSource(source.url);
+
       console.log('[Nemesis] style catalog fetched', {
         fileName: source.fileName,
         url: source.url,
         bytes: raw.length,
       });
+
       reportCatalogLoaded(source.fileName, raw.length);
+
       const data = JSON.parse(raw);
+
       styleCatalogs.push({
         meta: data.meta,
         styles: Array.isArray(data.styles) ? data.styles : [],
       });
+
     } catch (error) {
       const message =
         error && typeof error === 'object' && 'message' in error
           ? String((error as any).message)
           : String(error ?? 'Unknown error');
+
       logCatalogEvent(source, `failed: ${message}`);
     }
   }
@@ -206,95 +254,6 @@ export function getStyleCatalogs(): StyleCatalog[] {
   return styleCatalogs.slice();
 }
 
-type NormalizedElement = {
-  id?: number;
-  path: string;
-  type?: string;
-  componentKey?: string;
-  visible?: boolean;
-  opacity?: number | null;
-  opacityToken?: string | null;
-  radiusToken?: string | null;
-  fill?: {
-    color?: string | null;
-    token?: string | null;
-  };
-  stroke?: {
-    color?: string | null;
-    token?: string | null;
-    weight?: number | null;
-    align?: string | null;
-  };
-  layout?: {
-    padding?: number[];
-    gap?: number;
-    radius?: number | number[];
-    paddingTokens?: {
-      top?: string | null;
-      right?: string | null;
-      bottom?: string | null;
-      left?: string | null;
-    } | null;
-    gapToken?: string | null;
-  };
-  text?: { value?: string };
-  typography?: {
-    styleKey?: string | null;
-    token?: string | null;
-  };
-};
-
-type NormalizedJsonCatalog = {
-  kind: string;
-  source?: {
-    file?: string;
-    library?: string;
-  };
-  elements?: NormalizedElement[];
-  components?: NormalizedJsonComponent[];
-};
-
-type TokenCatalog = {
-  meta?: { fileName?: string; library?: string };
-  collections?: Array<{
-    id?: string;
-    name?: string;
-    defaultModeId?: string | null;
-    variables?: Array<{
-      key?: string;
-      name?: string;
-      tokenName?: string;
-      groupName?: string;
-      valuesByMode?: Record<string, any>;
-    }>;
-  } | null>;
-};
-
-type StyleCatalog = {
-  meta?: { fileName?: string; library?: string };
-  styles?: Array<{
-    key?: string;
-    name?: string;
-    group?: string;
-  } | null>;
-};
-
-type NormalizedJsonComponent = {
-  key?: string;
-  name?: string;
-  status?: string;
-  role?: string;
-  platform?: string;
-  description?: string;
-  category?: string;
-  defaultVariant?: string;
-  variants?: Array<{
-    id?: string;
-    key?: string;
-    name?: string;
-  }>;
-};
-
 function isAthenaCatalog(payload: unknown): payload is AthenaCatalog {
   return Boolean(
     payload &&
@@ -307,7 +266,9 @@ function isNormalizedJsonCatalog(
   payload: unknown,
 ): payload is NormalizedJsonCatalog {
   if (!payload || typeof payload !== 'object') return false;
+
   const catalog = payload as NormalizedJsonCatalog;
+
   return catalog.kind === 'catalog' && Array.isArray(catalog.elements);
 }
 
@@ -316,6 +277,7 @@ function parseNormalizedCatalog(
   fileName: string,
 ): AthenaCatalog | null {
   const elements = parseNormalizedElements(raw);
+
   if (!elements.length) {
     return null;
   }
@@ -327,13 +289,17 @@ function parseNormalizedJsonCatalog(
   fileName: string,
 ): AthenaCatalog {
   const elements = Array.isArray(payload.elements) ? payload.elements : [];
+
   const catalog = parseNormalizedCatalogFromElements(elements, fileName);
+
   if (payload.source?.library) {
     catalog.meta.library = payload.source.library;
   }
+
   if (Array.isArray(payload.components) && payload.components.length) {
     mergeNormalizedComponents(catalog, payload.components);
   }
+
   return catalog;
 }
 
@@ -344,10 +310,12 @@ function parseNormalizedCatalogFromElements(
   if (!elements.length) {
     return { meta: { fileName }, components: [] };
   }
+
   const rootComponents = elements.filter((el) => el.type === 'COMPONENT');
+
   const grouped: AthenaComponent[] = [];
-  const fallbackKey =
-    elements.find((el) => el.componentKey)?.componentKey ?? '';
+
+  const fallbackKey = elements.find((el) => el.componentKey)?.componentKey ?? '';
 
   if (!rootComponents.length) {
     grouped.push(
@@ -361,9 +329,11 @@ function parseNormalizedCatalogFromElements(
   } else {
     for (const root of rootComponents) {
       const rootPath = root.path;
+
       const group = elements.filter(
         (el) => el.path === rootPath || el.path.startsWith(`${rootPath} / `),
       );
+
       grouped.push(
         buildComponentFromElements(
           fileName,
@@ -401,6 +371,7 @@ function mergeNormalizedComponents(
     const match =
       (component.key && byKey.get(component.key)) ||
       (component.name && byName.get(component.name));
+      
     if (!match) continue;
     if (!component.key && match.key) {
       component.key = match.key;
@@ -489,6 +460,7 @@ function buildStructure(elements: NormalizedElement[]): DSStructureNode[] {
       type: element.type ?? 'FRAME',
       name,
       visible: element.visible !== false,
+      radius: null
     };
 
     const layout = buildNodeLayout(element.layout);
@@ -546,10 +518,13 @@ function buildStructure(elements: NormalizedElement[]): DSStructureNode[] {
 
 function buildNodeLayout(
   layout?: NormalizedElement['layout'],
-): DSStructureNode['layout'] | undefined {
-  if (!layout) return undefined;
+): DSStructureNode['layout'] | null {
+  if (!layout) return null;
+
   const out: DSStructureNode['layout'] = {};
+
   if (Array.isArray(layout.padding) && layout.padding.length === 4) {
+
     out.padding = {
       top: layout.padding[0] ?? null,
       right: layout.padding[1] ?? null,
@@ -557,10 +532,13 @@ function buildNodeLayout(
       left: layout.padding[3] ?? null,
     };
   }
+
   if (typeof layout.gap === 'number') {
     out.itemSpacing = layout.gap;
   }
+
   if (layout.paddingTokens) {
+    
     out.paddingTokens = {
       top: layout.paddingTokens.top ?? null,
       right: layout.paddingTokens.right ?? null,
@@ -568,17 +546,21 @@ function buildNodeLayout(
       left: layout.paddingTokens.left ?? null,
     };
   }
+
   if (layout.gapToken) {
     out.itemSpacingToken = layout.gapToken;
   }
-  return Object.keys(out).length ? out : undefined;
+  
+  return Object.keys(out).length ? out : null;
 }
 
 function mapRadius(
   radius: number | number[] | undefined,
-): DSStructureNode['radius'] | undefined {
-  if (radius === undefined) return undefined;
+): DSStructureNode['radius'] | null {
+  if (radius === undefined) return null;
+
   if (typeof radius === 'number') return radius;
+
   if (Array.isArray(radius) && radius.length === 4) {
     return {
       topLeft: radius[0],
@@ -587,7 +569,8 @@ function mapRadius(
       bottomLeft: radius[3],
     };
   }
-  return undefined;
+
+  return null;
 }
 
 function getParentPath(path: string): string | null {
@@ -610,12 +593,16 @@ function parseNormalizedElements(raw: string): NormalizedElement[] {
   const lines = raw.split('\n');
   for (const line of lines) {
     const trimmed = line.trim();
+
     if (!trimmed) continue;
 
     if (trimmed.startsWith('- path:')) {
       if (current) elements.push(current);
+
       current = { path: extractValue(trimmed) };
+
       section = null;
+
       continue;
     }
     if (!current) continue;
@@ -628,12 +615,15 @@ function parseNormalizedElements(raw: string): NormalizedElement[] {
       trimmed === 'typography:'
     ) {
       section = trimmed.replace(':', '');
+
       if (section === 'layout') {
         current.layout = {};
       }
+
       if (section === 'text') {
         current.text = {};
       }
+
       continue;
     }
 
@@ -641,23 +631,31 @@ function parseNormalizedElements(raw: string): NormalizedElement[] {
       current.type = trimmed.slice(5).trim();
       continue;
     }
+
     if (trimmed.startsWith('id:')) {
       const parsedId = parseInt(trimmed.slice(3).trim(), 10);
+
       if (!Number.isNaN(parsedId)) {
         current.id = parsedId;
       }
+
       continue;
     }
+
     if (trimmed.startsWith('componentKey:')) {
       current.componentKey = stripQuotes(trimmed.slice(13).trim());
+
       continue;
     }
+
     if (trimmed.startsWith('visible:')) {
       current.visible = trimmed.slice(8).trim() === 'true';
+
       continue;
     }
 
     if (section === 'layout' && current.layout) {
+      
       if (trimmed.startsWith('padding:')) {
         current.layout.padding = parseNumberArray(trimmed);
       } else if (trimmed.startsWith('gap:')) {
@@ -665,6 +663,7 @@ function parseNormalizedElements(raw: string): NormalizedElement[] {
       } else if (trimmed.startsWith('radius:')) {
         current.layout.radius = parseNumberOrArray(trimmed.slice(7).trim());
       }
+
       continue;
     }
 
@@ -672,6 +671,7 @@ function parseNormalizedElements(raw: string): NormalizedElement[] {
       if (trimmed.startsWith('value:')) {
         current.text.value = stripQuotes(trimmed.slice(6).trim());
       }
+
       continue;
     }
   }
@@ -682,7 +682,9 @@ function parseNormalizedElements(raw: string): NormalizedElement[] {
 
 function extractValue(line: string): string {
   const idx = line.indexOf(':');
+
   if (idx === -1) return line.trim();
+
   return stripQuotes(line.slice(idx + 1).trim());
 }
 
@@ -690,12 +692,15 @@ function stripQuotes(value: string): string {
   if (value.startsWith('"') && value.endsWith('"')) {
     return value.slice(1, -1);
   }
+
   return value;
 }
 
 function parseNumberArray(line: string): number[] {
   const match = line.match(/\[(.*)\]/);
+
   if (!match) return [];
+
   return match[1]
     .split(',')
     .map((item) => parseFloat(item.trim()))
@@ -704,6 +709,7 @@ function parseNumberArray(line: string): number[] {
 
 function parseNumberOrArray(value: string): number | number[] | undefined {
   if (!value) return undefined;
+
   if (value.startsWith('[')) {
     const arr = value
       .replace(/^\[/, '')
@@ -714,6 +720,7 @@ function parseNumberOrArray(value: string): number | number[] | undefined {
     return arr;
   }
   const num = parseFloat(value);
+
   return Number.isNaN(num) ? undefined : num;
 }
 
@@ -826,22 +833,32 @@ function formatRgba(color: { r: number; g: number; b: number; a?: number }) {
 
 function hydrateCatalogs(modules: AthenaCatalog[]) {
   catalogs = modules;
+
   partHostMap.clear();
+
   corporateNameIndex.clear();
+
   missingReferenceLog.clear();
+
   let totalComponents = 0;
+
   const uniqueKeys = new Set<string>();
+
   const validationWarnings: string[] = [];
+
   for (const module of catalogs) {
     console.log('[Nemesis] catalog loaded summary', {
       fileName: module.meta?.fileName ?? 'unknown',
       componentCount: module.components?.length ?? 0,
     });
+
     for (const component of module.components ?? []) {
       totalComponents += 1;
+
       if (component.key) {
         uniqueKeys.add(component.key);
       }
+
       if (component.variants) {
         for (const variant of component.variants) {
           if (variant?.key) {
@@ -849,8 +866,11 @@ function hydrateCatalogs(modules: AthenaCatalog[]) {
           }
         }
       }
+
       prepareComponent(component, module);
+
       registerPartUsage(component as unknown as LibraryComponent);
+
       validationWarnings.push(
         ...validateCatalogComponent(
           component,
@@ -864,10 +884,12 @@ function hydrateCatalogs(modules: AthenaCatalog[]) {
     componentCount: totalComponents,
     uniqueKeys: uniqueKeys.size,
   });
+
   if (validationWarnings.length) {
     for (const warning of validationWarnings.slice(0, 50)) {
       console.warn(`[Nemesis::catalog] ${warning}`);
     }
+
     if (validationWarnings.length > 50) {
       console.warn(
         `[Nemesis::catalog] Дополнительно ${validationWarnings.length - 50} предупреждений`,
@@ -883,25 +905,28 @@ function validateCatalogComponent(
   const warnings: string[] = [];
   const hasVariants =
     Array.isArray(component.variants) && component.variants.length > 0;
+
   if (!hasVariants) {
     return warnings;
   }
+  
   if (!component.variantStructures) {
     warnings.push(
       `Нет variantStructures для «${component.name}» (${fileName})`,
     );
     return warnings;
   }
+
   const missingVariantKeys = component.variants
-    .filter(
-      (variant) => variant?.key && !component.variantStructures?.[variant.key],
-    )
+    ?.filter((variant) => variant?.key && !component.variantStructures?.[variant.key])
     .map((variant) => variant?.name ?? variant?.key ?? 'unknown');
-  if (missingVariantKeys.length) {
+
+  if (missingVariantKeys?.length) {
     warnings.push(
       `variantStructures неполные для «${component.name}» (${fileName}): ${missingVariantKeys.join(', ')}`,
     );
   }
+
   return warnings;
 }
 
@@ -913,19 +938,25 @@ function logCatalogEvent(source: ReferenceCatalogSource, message: string) {
   });
 }
 
-export function reportMissingReference(key: string, name: string) {
+export function reportMissingReference(name: string, key: string | null) {
   const signature = `${key}::${name}`;
+
   if (missingReferenceLog.has(signature)) {
     return;
   }
+
   if (missingReferenceLog.size >= 20) {
     return;
   }
+
   missingReferenceLog.add(signature);
+
   const message = `Не найден компонент с ключом ${key} (${name})`;
+
   console.warn(`[Nemesis::catalog] ${message}`);
+
   try {
-    figma.ui?.postMessage({
+    figma.ui.postMessage({
       type: 'catalog-miss-debug',
       payload: { key, name },
     });
@@ -955,11 +986,7 @@ export const primaryCatalog: LibraryCatalog = {
   components: [],
 };
 
-export function getCatalogComponentsSnapshot(): LibraryComponent[] {
-  return Array.from(iterateCatalogComponents());
-}
-
-export function* iterateCatalogComponents(): IterableIterator<LibraryComponent> {
+function* iterateCatalogComponents(): IterableIterator<LibraryComponent> {
   for (const module of catalogs) {
     for (const component of module.components ?? []) {
       yield component as unknown as LibraryComponent;
@@ -967,32 +994,28 @@ export function* iterateCatalogComponents(): IterableIterator<LibraryComponent> 
   }
 }
 
-export function findComponentByKeyOrName(
-  key: string | null,
-  name: string,
+export function findComponent(
+  key: string,
 ): LibraryComponent | null {
-  if (key) {
-    const direct = findCatalogComponentByKey(key);
-    if (direct) {
-      return direct;
-    }
-  }
-
-  return null;
+  const direct = findCatalogComponentByKey(key);
+    
+  return direct ?? null;
 }
 
-export function findCatalogComponentByKey(
-  key: string | null | undefined,
+function findCatalogComponentByKey(
+  key: string,
 ): LibraryComponent | null {
-  if (!key) return null;
   for (const component of iterateCatalogComponents()) {
     if (component.key === key) {
       return component;
     }
+
     if (component.variants?.some((variant) => variant.key === key)) {
       return component;
     }
+
   }
+
   return null;
 }
 
@@ -1001,6 +1024,7 @@ export function resolveStructure(
   variantKey?: string | null,
 ): DSStructureNode[] | null {
   if (!component) return null;
+
   if (
     variantKey &&
     component.variantStructures &&
@@ -1011,19 +1035,18 @@ export function resolveStructure(
       component.variantStructures[variantKey],
     );
   }
+
   if (component.structure && component.structure.length > 0) {
     return cloneStructure(component.structure);
   }
-  return null;
-}
 
-export function getHostKeysForPart(partKey: string): string[] {
-  return Array.from(partHostMap.get(partKey) ?? []);
+  return null;
 }
 
 function prepareComponent(component: AthenaComponent, module: AthenaCatalog) {
   normalizeComponentPaints(component);
   const role = mapRole(component.role);
+
   const parentName =
     component.parentComponent?.name ||
     component.meta?.pageName ||
@@ -1046,7 +1069,9 @@ function prepareComponent(component: AthenaComponent, module: AthenaCatalog) {
     const key = component.name.includes('[Corporate]')
       ? `${canonicalName}::corp-variant`
       : `${canonicalName}::base-variant`;
+
     corporateNameIndex.set(key, libraryComponent);
+
     if (!(component as any).variants) {
       corporateNameIndex.set(
         `${canonicalName}::${component.name.includes('[Corporate]') ? 'corp' : 'base'}`,
@@ -1149,7 +1174,9 @@ function buildStructureFromPatches(
   patches: DSVariantStructurePatch[] | undefined,
 ): DSStructureNode[] {
   const nodes = cloneStructure(base ?? []);
+
   const nodeMap = new Map<number, DSStructureNode>();
+
   for (const node of nodes) {
     nodeMap.set(node.id, node);
   }
@@ -1198,13 +1225,18 @@ function cloneNode(node: DSStructureNode): DSStructureNode {
 function registerPartUsage(component: LibraryComponent) {
   const registerFromNodes = (nodes?: DSStructureNode[] | null) => {
     if (!nodes) return;
+
     for (const node of nodes) {
       const partKey = node.componentInstance?.componentKey;
+
       if (!partKey) continue;
+
       if (!partHostMap.has(partKey)) {
         partHostMap.set(partKey, new Set());
       }
+
       const bucket = partHostMap.get(partKey)!;
+
       if (component.key) {
         bucket.add(component.key);
       } else if (component.displayName) {
@@ -1214,13 +1246,15 @@ function registerPartUsage(component: LibraryComponent) {
   };
 
   registerFromNodes(component.structure);
+
   if ((component as any).variantStructures) {
     for (const variantKey of Object.keys(component.variantStructures ?? {})) {
       registerFromNodes(resolveStructure(component, variantKey));
-      const variantEntry = Object.assign({}, component, {
-        name: variantKey,
-      }) as LibraryComponent;
+
+      const variantEntry = Object.assign({}, component, { name: variantKey }) as LibraryComponent;
+      
       const canonicalName = normalizeCorporateName(component.name);
+
       if (canonicalName) {
         corporateNameIndex.set(
           `${canonicalName}::${component.name.includes('[Corporate]') ? 'corp' : 'base'}-variant-${variantKey}`,
@@ -1235,6 +1269,7 @@ function normalizeCorporateName(
   name: string | null | undefined,
 ): string | null {
   if (!name) return null;
+
   return name.replace(/\[(.+?)\]\s*/g, '').trim();
 }
 
@@ -1243,14 +1278,18 @@ export function getCorporateCounterpart(componentName: string): {
   corporate?: LibraryComponent | null;
 } | null {
   const canonical = normalizeCorporateName(componentName);
+
   if (!canonical) return null;
+
   const base =
     corporateNameIndex.get(`${canonical}::base`) ??
     corporateNameIndex.get(`${canonical}::base-variant`) ??
     null;
+
   const corporate =
     corporateNameIndex.get(`${canonical}::corp`) ??
     corporateNameIndex.get(`${canonical}::corp-variant`) ??
     null;
+    
   return { base, corporate };
 }

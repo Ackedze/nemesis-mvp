@@ -5,7 +5,7 @@ const isWatch = process.argv.includes('--watch');
 
 const common = {
   entryPoints: {
-    code: 'src/code.ts',
+    code: './src/code.ts',
   },
   bundle: true,
   outdir: 'dist',
@@ -15,6 +15,7 @@ const common = {
   target: ['es2019'],
   loader: {
     '.json': 'json',
+    '.ts': 'ts',
   },
 };
 

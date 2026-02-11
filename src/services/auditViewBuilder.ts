@@ -1,6 +1,5 @@
 import {
-  findComponentByKeyOrName,
-  LibraryComponent,
+  findComponent,
 } from '../reference/library';
 import type { DiffEntry } from '../structure/diff';
 import type {
@@ -30,15 +29,16 @@ export interface CustomStyleCollectionOptions {
 /**
  * Собирает все узлы, у которых явно навешаны кастомные стили (заливка/обводка/текст) вне компонентных диффов.
  */
-export function collectCustomStyleEntries(
-  selection: readonly SceneNode[],
+export function collectCustomStyles(
+  node: SceneNode,
   options: CustomStyleCollectionOptions,
 ): CustomStyleEntry[] {
   const entries: CustomStyleEntry[] = [];
 
-    const visit = (node: SceneNode) => {
-      if (node.type === 'SECTION') return;
+    if (node.type === 'SECTION') return entries;
+
     const reasons = describeCustomStyleReasons(node, options);
+
     if (reasons.length) {
       for (const reason of reasons) {
         entries.push({
@@ -51,16 +51,7 @@ export function collectCustomStyleEntries(
         });
       }
     }
-    if ('children' in node) {
-      for (const child of node.children as SceneNode[]) {
-        visit(child);
-      }
-    }
-  };
-
-  for (const node of selection) {
-    visit(node);
-  }
+  
   return entries;
 }
 
@@ -92,48 +83,37 @@ export function collectTextNodesFromSelection(
  * Находит detachd (освобождённые) frames/groups, которые раньше привязаны к библиотеке,
  * чтобы показать их в отдельном табе.
  */
-export function collectDetachedEntries(
-  selection: readonly SceneNode[],
-): DetachedEntry[] {
-  const entries: DetachedEntry[] = [];
+export function collectDetachedEntry(
+  node: SceneNode,
+): DetachedEntry | null {
+  if (node.type === 'FRAME' || node.type === 'GROUP') {
+    const info = (node as any).detachedInfo as
+      | { type: 'local'; componentId: string }
+      | { type: 'library'; componentKey: string }
+      | null;
 
-  const visitNode = (node: SceneNode) => {
-    if (node.type === 'FRAME' || node.type === 'GROUP') {
-      const info = (node as any).detachedInfo as
-        | { type: 'local'; componentId: string }
-        | { type: 'library'; componentKey: string }
-        | null;
-      if (info && info.type === 'library' && info.componentKey) {
-        const componentRef = findComponentByKeyOrName(
-          info.componentKey,
-          node.name,
-        );
-        if (componentRef) {
-          entries.push({
-            id: node.id,
-            name: node.name,
-            pageName: getPageName(node),
-            path: buildNodePath(node),
-            componentKey: info.componentKey,
-            libraryName:
-              componentRef.source ?? componentRef.name ?? 'Дизайн-система',
-            componentName: componentRef.name ?? null,
-            visible: isNodeVisible(node),
-          });
+    if (info && info.type === 'library' && info.componentKey) {
+      const componentRef = findComponent(
+        info.componentKey,
+      );
+
+      if (componentRef) {
+        return {
+          id: node.id,
+          name: node.name,
+          pageName: getPageName(node),
+          path: buildNodePath(node),
+          componentKey: info.componentKey,
+          libraryName:
+            componentRef.source ?? componentRef.names[0] ?? 'Дизайн-система',
+          componentName: componentRef.names[0] ?? null,
+          visible: isNodeVisible(node),
         }
       }
     }
-    if ('children' in node) {
-      for (const child of node.children as SceneNode[]) {
-        visitNode(child);
-      }
-    }
-  };
-
-  for (const node of selection) {
-    visitNode(node);
   }
-  return entries;
+
+  return null;
 }
 
 export function filterVisibleEntries<T extends { visible?: boolean } & {
@@ -146,7 +126,7 @@ export function filterVisibleEntries<T extends { visible?: boolean } & {
 /**
  * Проверяет, виден ли узел с учётом всей иерархии пути (используется и в tab-фильтрах).
  */
-export function isEntryVisible(item: { visible?: boolean; pathSegments?: PathSegment[] }) {
+function isEntryVisible(item: { visible?: boolean; pathSegments?: PathSegment[] }) {
   if (!item) return false;
   if (item.visible === false) return false;
   const segments = item.pathSegments;
@@ -168,14 +148,12 @@ export function isEntryVisible(item: { visible?: boolean; pathSegments?: PathSeg
  * Убирает технические diff-строки и (при необходимости) скрытые узлы,
  * чтобы таб «Кастомизация» показывал только информативные изменения.
  */
-export function prepareChangeDiffs(
+function prepareChangeDiffs(
   diffs: DiffEntry[],
-  options: { visibleOnly: boolean },
 ): DiffEntry[] {
   const rawDiffs = Array.isArray(diffs) ? diffs : [];
-  const visibleDiffs = options.visibleOnly
-    ? rawDiffs.filter((diff) => diff.visible !== false)
-    : rawDiffs.slice();
+  const visibleDiffs =  rawDiffs.filter((diff) => diff.visible !== false)
+
   return dedupeDiffs(visibleDiffs);
 }
 
@@ -185,22 +163,21 @@ export function prepareChangeDiffs(
  */
 export function computeChangesResults(
   items: AuditItem[],
-  options: { visibleOnly: boolean },
 ): AuditItem[] {
   const instanceItems = items.filter((item) => item.nodeType === 'INSTANCE');
   return instanceItems.filter((item) => {
     if (item.themeStatus === 'error') {
       return false;
     }
-    if (options.visibleOnly && !isEntryVisible(item)) {
+    if (!isEntryVisible(item)) {
       return false;
     }
-    const diffs = prepareChangeDiffs(item.diffs ?? [], options);
+    const diffs = prepareChangeDiffs(item.diffs ?? []);
     return diffs.length > 0;
   });
 }
 
-function describeTextNode(
+export function describeTextNode(
   node: TextNode,
   options: TextNodeCollectionOptions,
 ): TextNodeEntry {
@@ -214,11 +191,13 @@ function describeTextNode(
   }
   const paintInfo = solid
     ? describeTextPaint(solid, options)
-    : { label: '—', usesToken: false };
+    : { label: '—', usesToken: false, library : null };
+
   const usesStyle =
     'fillStyleId' in node &&
     !!node.fillStyleId &&
     node.fillStyleId !== figma.mixed;
+
   return {
     key: node.id,
     name: node.name,
@@ -236,8 +215,9 @@ function describeTextNode(
 function describeTextPaint(
   paint: SolidPaint,
   options: TextNodeCollectionOptions,
-): { label: string; usesToken: boolean; library?: string } {
+): { label: string; usesToken: boolean; library: string | null } {
   const tokenInfo = getTokenAliasInfo(paint, options.tokenLabelMap);
+
   if (tokenInfo.aliasKey) {
     return {
       label: tokenInfo.label ?? tokenInfo.aliasKey,
@@ -248,15 +228,12 @@ function describeTextPaint(
   const r = clampColorComponent(paint.color.r);
   const g = clampColorComponent(paint.color.g);
   const b = clampColorComponent(paint.color.b);
-  const opacity =
-    typeof paint.opacity === 'number'
-      ? paint.opacity
-      : typeof paint.alpha === 'number'
-        ? paint.alpha
-        : 1;
+  const opacity = paint.opacity ?? 1;
+
   return {
     label: `rgba(${r}, ${g}, ${b}, ${opacity.toFixed(2)})`,
     usesToken: false,
+    library: null
   };
 }
 

@@ -26,7 +26,7 @@ function makePath(parent: string, name: string): string {
  * Рекурсивно перебирает дерево узла и формирует плоский список DSStructureNode
  * с корректным учётом effective visibility, layout, fill/stroke и прочих метаданных.
  */
-export async function snapshotTree(root: SceneNode): Promise<DSStructureNode[]> {
+export async function snapshotTree(root: SceneNode, checkedComponentNodesList: Set<string>): Promise<DSStructureNode[]> {
   const list: DSStructureNode[] = [];
   let nextId = 1;
 
@@ -36,6 +36,12 @@ export async function snapshotTree(root: SceneNode): Promise<DSStructureNode[]> 
     parentId: number | null,
     parentVisible: boolean,
   ) {
+    if (!node.visible) {
+      return
+    }
+
+    checkedComponentNodesList.add(node.id);
+
     const id = nextId++;
     const nodeVisible = getNodeSelfVisible(node);
     const effectiveVisible = parentVisible && nodeVisible;
@@ -79,25 +85,35 @@ export async function snapshotNormalizedContext(
     activeComponentKey: string | null,
     parentVisible: boolean,
   ) {
+    const nodeVisible = getNodeSelfVisible(node);
+
+    if (!nodeVisible) {
+      return 
+    }
+
     let nextComponentKey = activeComponentKey;
+
     if (node.type === 'INSTANCE') {
       const inst = node as InstanceNode;
+
       const mainComponent =
         typeof inst.getMainComponentAsync === 'function'
           ? await inst.getMainComponentAsync()
           : inst.mainComponent;
+
       if (mainComponent?.key) {
         nextComponentKey = mainComponent.key;
       }
+
     } else if (node.type === 'COMPONENT' && 'key' in node) {
       const key = (node as ComponentNode).key;
+
       if (key) {
         nextComponentKey = key;
       }
     }
 
     const path = makePath(parentPath, node.name);
-    const nodeVisible = getNodeSelfVisible(node);
     const effectiveVisible = parentVisible && nodeVisible;
     const element: DSNormalizedElement = {
       path,
@@ -159,68 +175,29 @@ export async function snapshotNormalizedContext(
 /**
  * Базовый снимок одного узла: собирает layout, paint, radius, эффекты и связанную компоненту.
  */
-async function snapshotNode(
+export async function snapshotNode(
   node: SceneNode,
   parentPath: string,
-  parentId: number | null,
-  id: number,
-  visible: boolean,
 ): Promise<DSStructureNode> {
   const path = makePath(parentPath, node.name);
+
   const snap: DSStructureNode = {
-    id,
     nodeId: node.id,
-    parentId,
     path,
     type: node.type,
     name: node.name,
-    visible,
+    styles: extractStyles(node),
+    fill: extractFillInfo(node),
+    stroke: extractStrokeInfo(node),
+    layout: extractLayout(node),
+    opacity: 'opacity' in node ? node.opacity : 1,
+    opacityToken: getBoundVariableId(node.boundVariables, 'opacity'),
+    componentInstance: await extractInstance(node),
+    text: extractText(node),
+    radius: extractRadius(node),
+    radiusToken: getBoundVariableId(node.boundVariables, 'cornerRadius'),
+    effects: extractEffects(node),
   };
-
-  const styles = extractStyles(node);
-  if (styles) {
-    snap.styles = styles;
-  }
-
-  const fillInfo = extractFillInfo(node);
-  if (fillInfo) {
-    snap.fill = fillInfo;
-  }
-
-  const strokeInfo = extractStrokeInfo(node);
-  if (strokeInfo) {
-    snap.stroke = strokeInfo;
-  }
-
-  const layout = extractLayout(node);
-  if (layout) {
-    snap.layout = layout;
-  }
-
-  if ('opacity' in node && typeof (node as any).opacity === 'number') {
-    snap.opacity = (node as any).opacity;
-  }
-  const bound = (node as any).boundVariables;
-  const opacityToken = getBoundVariableId(bound, 'opacity');
-  if (opacityToken) {
-    snap.opacityToken = opacityToken;
-  }
-
-  const inst = await extractInstance(node);
-  if (inst) snap.componentInstance = inst;
-
-  const text = extractText(node);
-  if (text) snap.text = text;
-
-  const radius = extractRadius(node);
-  if (typeof radius !== 'undefined') snap.radius = radius;
-  const radiusToken = getBoundVariableId(bound, 'cornerRadius');
-  if (radiusToken) {
-    snap.radiusToken = radiusToken;
-  }
-
-  const effects = extractEffects(node);
-  if (effects && effects.length > 0) snap.effects = effects;
 
   return snap;
 }
@@ -311,8 +288,11 @@ async function extractInstance(
 
 function extractText(node: SceneNode): DSTextContent | undefined {
   if (node.type !== 'TEXT') return undefined;
+
   const t = node as TextNode;
+
   const result: DSTextContent = {};
+
   let hasData = false;
 
   if (typeof t.characters === 'string') {
@@ -324,8 +304,9 @@ function extractText(node: SceneNode): DSTextContent | undefined {
     if (t.lineHeight.unit === 'PIXELS') {
       result.lineHeight = t.lineHeight.value;
     } else {
-      result.lineHeight = `${t.lineHeight.unit}(${t.lineHeight.value})`;
+      result.lineHeight = `${t.lineHeight.unit}`;
     }
+
     hasData = true;
   }
 
@@ -340,7 +321,7 @@ function extractText(node: SceneNode): DSTextContent | undefined {
   }
 
   if (t.textCase && t.textCase !== 'ORIGINAL') {
-    result.case = t.textCase;
+    result.case = t.textCase.toString();
     hasData = true;
   }
 
@@ -477,34 +458,40 @@ function getBoundVariableId(boundVariables: any, key: string): string | null {
   return candidate ? String(candidate) : null;
 }
 
-function extractRadius(node: SceneNode): DSRadii | undefined {
-  if ('cornerRadius' in node) {
-    if (typeof (node as CornerMixin).cornerRadius === 'number' && (node as CornerMixin).cornerRadius !== figma.mixed) {
-      return (node as CornerMixin).cornerRadius;
-    }
-    const mixin = node as CornerMixin & IndividualCornerMixin;
-    if (
-      typeof mixin.topLeftRadius === 'number' &&
-      typeof mixin.topRightRadius === 'number' &&
-      typeof mixin.bottomRightRadius === 'number' &&
-      typeof mixin.bottomLeftRadius === 'number'
-    ) {
-      const values: DSRadiiValues = {
-        topLeft: mixin.topLeftRadius,
-        topRight: mixin.topRightRadius,
-        bottomRight: mixin.bottomRightRadius,
-        bottomLeft: mixin.bottomLeftRadius,
-      };
-      return values;
-    }
+function extractRadius(node: SceneNode): DSRadii | null {
+  if ('cornerRadius' in node === false) {
+    return null;
   }
-  return undefined;
+
+  if (typeof node.cornerRadius === 'number') {
+    return node.cornerRadius;
+  }
+
+  const mixin = node as CornerMixin & RectangleCornerMixin;
+
+  if (
+    typeof mixin.topLeftRadius === 'number' &&
+    typeof mixin.topRightRadius === 'number' &&
+    typeof mixin.bottomRightRadius === 'number' &&
+    typeof mixin.bottomLeftRadius === 'number'
+  ) {
+    const values: DSRadiiValues = {
+      topLeft: mixin.topLeftRadius,
+      topRight: mixin.topRightRadius,
+      bottomRight: mixin.bottomRightRadius,
+      bottomLeft: mixin.bottomLeftRadius,
+    };
+    return values;
+  }
+
+  return null
 }
 
 function extractNormalizedLayout(
   node: SceneNode,
 ): DSNormalizedElement['layout'] | undefined {
   const layout: DSNormalizedElement['layout'] = {};
+
   if (
     'layoutMode' in node &&
     (node as AutoLayoutMixin).layoutMode &&
@@ -522,6 +509,7 @@ function extractNormalizedLayout(
   }
 
   const radius = extractRadius(node);
+
   if (typeof radius === 'number') {
     layout.radius = radius;
   } else if (radius) {
@@ -538,10 +526,13 @@ function extractNormalizedLayout(
 
 function extractEffects(node: SceneNode): DSEffect[] | undefined {
   if (!('effects' in node)) return undefined;
+
   const effects = (node as any).effects;
+
   if (!effects || effects === figma.mixed || effects.length === 0) return undefined;
 
   const result: DSEffect[] = [];
+  
   for (const e of effects) {
     result.push({
       type: e.type,

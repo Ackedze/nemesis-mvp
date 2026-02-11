@@ -1,31 +1,3 @@
-export type TabId =
-  | 'current'
-  | 'detached'
-  | 'changes'
-  | 'deprecated'
-  | 'update'
-  | 'themeError'
-  | 'presets'
-  | 'local'
-  | 'customStyles';
-
-export type TabBuilderKey =
-  | 'audit'
-  | 'changes'
-  | 'customStyles'
-  | 'textEntry'
-  | 'detached'
-  | 'preset';
-
-export interface TabDefinition {
-  id: TabId;
-  title: string;
-  emptyMessage: string;
-  builder: TabBuilderKey;
-  ignoreComponentFilter?: boolean;
-  requiresScan?: boolean;
-}
-
 export const tabDefinitions: TabDefinition[] = [
   {
     id: 'current',
@@ -86,3 +58,31 @@ export const tabDefinitions: TabDefinition[] = [
     ignoreComponentFilter: true,
   },
 ];
+
+type TabId =
+  | 'current'
+  | 'detached'
+  | 'changes'
+  | 'deprecated'
+  | 'update'
+  | 'themeError'
+  | 'presets'
+  | 'local'
+  | 'customStyles';
+
+type TabBuilderKey =
+  | 'audit'
+  | 'changes'
+  | 'customStyles'
+  | 'textEntry'
+  | 'detached'
+  | 'preset';
+
+interface TabDefinition {
+  id: TabId;
+  title: string;
+  emptyMessage: string;
+  builder: TabBuilderKey;
+  ignoreComponentFilter?: boolean;
+  requiresScan?: boolean;
+}

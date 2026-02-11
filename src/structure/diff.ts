@@ -1,4 +1,4 @@
-import type { DSStructureNode } from '../types/structures';
+import type { DSRadii, DSStructureNode } from '../types/structures';
 
 export type DiffEntry = {
   message: string;
@@ -8,7 +8,7 @@ export type DiffEntry = {
   visible?: boolean;
 };
 
-export type DiffResult = {
+type DiffResult = {
   diffs: DiffEntry[];
   issues: string[];
 };
@@ -24,7 +24,6 @@ export function diffStructures(
   },
 ): DiffResult {
   const diffs: DiffEntry[] = [];
-  const issues: string[] = [];
   const issueSet = new Set<string>();
   const actualMap = new Map(actual.map((node) => [node.path, node]));
   const referenceMap = new Map(reference.map((node) => [node.path, node]));
@@ -42,7 +41,6 @@ export function diffStructures(
       node,
       ref,
       diffs,
-      issues,
       issueSet,
       strict,
       resolveTokenLabel,
@@ -51,7 +49,7 @@ export function diffStructures(
     );
   }
 
-  return { diffs, issues };
+  return { diffs, issues: Array.from(issueSet.values()) };
 }
 
 function compareNode(
@@ -59,7 +57,6 @@ function compareNode(
   actual: DSStructureNode,
   reference: DSStructureNode,
   diffs: DiffEntry[],
-  issues: string[],
   issueSet: Set<string>,
   strict: boolean,
   resolveTokenLabel?: (token: string) => string | null,
@@ -77,7 +74,6 @@ function compareNode(
     actualLayout.paddingTokens ?? null,
     referenceLayout.paddingTokens ?? null,
     diffs,
-    issues,
     issueSet,
     strict,
   );
@@ -91,7 +87,6 @@ function compareNode(
     if (strict && (actualLayout.itemSpacing ?? null) === null) {
       addIssue(
         issueSet,
-        issues,
         `Нет данных для itemSpacing в снапшоте для «${path}»`,
       );
     } else {
@@ -105,10 +100,10 @@ function compareNode(
   }
   if (referenceLayout.itemSpacingToken) {
     const actualToken = actualLayout.itemSpacingToken ?? null;
+    
     if (strict && !actualToken) {
       addIssue(
         issueSet,
-        issues,
         `Нет данных для token itemSpacing в снапшоте для «${path}»`,
       );
     } else if (actualToken !== referenceLayout.itemSpacingToken) {
@@ -128,11 +123,9 @@ function compareNode(
     actual.styles?.fill?.styleKey,
     reference.styles?.fill?.styleKey,
     diffs,
-    issues,
-    issueSet,
-    strict,
     resolveStyleLabel,
   );
+
   compareStyle(
     'обводка',
     path,
@@ -140,11 +133,9 @@ function compareNode(
     actual.styles?.stroke?.styleKey,
     reference.styles?.stroke?.styleKey,
     diffs,
-    issues,
-    issueSet,
-    strict,
     resolveStyleLabel,
   );
+
   compareStyle(
     'текст',
     path,
@@ -152,11 +143,9 @@ function compareNode(
     actual.styles?.text?.styleKey,
     reference.styles?.text?.styleKey,
     diffs,
-    issues,
-    issueSet,
-    strict,
     resolveStyleLabel,
   );
+
   comparePaint(
     'заливка',
     path,
@@ -164,19 +153,18 @@ function compareNode(
     actual.fill,
     reference.fill,
     diffs,
-    issues,
     issueSet,
     strict,
     resolveTokenLabel,
     resolveColorLabel,
   );
+
   compareStroke(
     path,
     actual,
     actual.stroke,
     reference.stroke,
     diffs,
-    issues,
     issueSet,
     strict,
     resolveTokenLabel,
@@ -186,15 +174,15 @@ function compareNode(
   compareRadius(
     path,
     actual,
-    actual.radius,
-    reference.radius,
+    actual.radius ?? null,
+    reference.radius ?? null,
     actual.radiusToken ?? null,
     reference.radiusToken ?? null,
     diffs,
-    issues,
     issueSet,
     strict,
   );
+
   compareOpacity(
     path,
     actual,
@@ -203,7 +191,6 @@ function compareNode(
     actual.opacityToken ?? null,
     reference.opacityToken ?? null,
     diffs,
-    issues,
     issueSet,
     strict,
   );
@@ -249,7 +236,6 @@ function comparePadding(
     | null
     | undefined,
   diffs: DiffEntry[],
-  issues: string[],
   issueSet: Set<string>,
   strict: boolean,
 ) {
@@ -259,20 +245,23 @@ function comparePadding(
     'bottom',
     'left',
   ];
+
   for (const side of sides) {
     const a = actual?.[side] ?? null;
     const b = reference?.[side] ?? null;
+
     if (b === null) {
       continue;
     }
+
     if (strict && a === null) {
       addIssue(
         issueSet,
-        issues,
         `Нет данных для padding ${label(side)} в снапшоте для «${path}»`,
       );
       continue;
     }
+
     if (a !== b) {
       pushDiff(
         diffs,
@@ -282,13 +271,16 @@ function comparePadding(
       );
       continue;
     }
+
     const refToken = referenceTokens?.[side] ?? null;
+
     if (refToken) {
       const actualToken = actualTokens?.[side] ?? null;
+
       if (strict && !actualToken) {
         addIssue(
           issueSet,
-          issues,
+          
           `Нет данных для token padding ${label(side)} в снапшоте для «${path}»`,
         );
       } else if (actualToken !== refToken) {
@@ -320,17 +312,17 @@ function compareStyle(
   actual: string | undefined,
   reference: string | undefined,
   diffs: DiffEntry[],
-  issues: string[],
-  issueSet: Set<string>,
-  strict: boolean,
   resolveStyleLabel?: (styleKey: string) => string | null,
 ) {
   if (reference === undefined) return;
+
   if ((actual ?? null) === (reference ?? null)) return;
+
   const formatStyle = (styleKey: string | null | undefined) => {
     if (!styleKey) return '—';
     return resolveStyleLabel ? resolveStyleLabel(styleKey) || styleKey : styleKey;
   };
+
   pushDiff(
     diffs,
     actualNode,
@@ -346,21 +338,21 @@ function comparePaint(
   actual: { color?: string | null; token?: string | null } | null | undefined,
   reference: { color?: string | null; token?: string | null } | null | undefined,
   diffs: DiffEntry[],
-  issues: string[],
   issueSet: Set<string>,
   strict: boolean,
   resolveTokenLabel?: (token: string) => string | null,
   resolveColorLabel?: (color: string) => string | null,
 ) {
   if (!reference || (!reference.color && !reference.token)) return;
+
   if (strict && (!actual || (!actual.color && !actual.token))) {
     addIssue(
       issueSet,
-      issues,
       `Нет данных для ${label} в снапшоте для «${path}»`,
     );
     return;
   }
+
   const actualToken = actual?.token ?? null;
   const referenceToken = reference.token ?? null;
   const actualColor = actual?.color ?? null;
@@ -383,18 +375,20 @@ function comparePaint(
     referenceTokenLabel = resolveColorLabel(referenceColor);
   }
 
-  if (referenceTokenLabel) {
-    if (actualTokenLabel) {
-      if (referenceTokenLabel === actualTokenLabel) return;
-      pushDiff(
-        diffs,
-        actualNode,
-        path,
-        `${label}: ${referenceTokenLabel} → token: ${actualTokenLabel}`,
-      );
+  if (referenceTokenLabel && actualTokenLabel) {
+    if (referenceTokenLabel === actualTokenLabel) return;
+    
+    pushDiff(
+      diffs,
+      actualNode,
+      path,
+      `${label}: ${referenceTokenLabel} → token: ${actualTokenLabel}`,
+    );
+
       return;
     }
-    if (actualColor) {
+    
+    if (actualColor && referenceTokenLabel) {
       pushDiff(
         diffs,
         actualNode,
@@ -403,7 +397,6 @@ function comparePaint(
       );
       return;
     }
-  }
 
   if (referenceColor) {
     if (actualTokenLabel) {
@@ -415,7 +408,9 @@ function comparePaint(
       );
       return;
     }
+
     if (referenceColor === actualColor) return;
+    
     pushDiff(
       diffs,
       actualNode,
@@ -448,7 +443,6 @@ function compareStroke(
     | null
     | undefined,
   diffs: DiffEntry[],
-  issues: string[],
   issueSet: Set<string>,
   strict: boolean,
   resolveTokenLabel?: (token: string) => string | null,
@@ -482,6 +476,7 @@ function compareStroke(
     }
     return;
   }
+
   comparePaint(
     'обводка',
     path,
@@ -489,23 +484,24 @@ function compareStroke(
     actual,
     reference,
     diffs,
-    issues,
     issueSet,
     strict,
     resolveTokenLabel,
     resolveColorLabel,
   );
+  
   if (reference.weight !== undefined && reference.weight !== null) {
     const actualWeight =
       actual && typeof actual.weight === 'number' ? actual.weight : null;
+
     if (strict && actualWeight === null) {
       addIssue(
         issueSet,
-        issues,
         `Нет данных для толщины обводки в снапшоте для «${path}»`,
       );
       return;
     }
+
     if (actualWeight !== reference.weight) {
       pushDiff(
         diffs,
@@ -520,29 +516,28 @@ function compareStroke(
 function compareRadius(
   path: string,
   actualNode: DSStructureNode,
-  actual: DSRadii | undefined,
-  reference: DSRadii | undefined,
+  actual: DSRadii | null,
+  reference: DSRadii | null,
   actualToken: string | null,
   referenceToken: string | null,
   diffs: DiffEntry[],
-  issues: string[],
   issueSet: Set<string>,
   strict: boolean,
 ) {
-  if (reference === undefined) return;
-  if (strict && typeof actual === 'undefined') {
+  if (reference === null) return;
+
+  if (strict && actual === null) {
     addIssue(
       issueSet,
-      issues,
       `Нет данных для скруглений в снапшоте для «${path}»`,
     );
     return;
   }
+
   if (referenceToken) {
     if (strict && !actualToken) {
       addIssue(
         issueSet,
-        issues,
         `Нет данных для token radius в снапшоте для «${path}»`,
       );
     } else if (actualToken !== referenceToken) {
@@ -554,8 +549,10 @@ function compareRadius(
       );
     }
   }
+
   if (JSON.stringify(actual ?? null) === JSON.stringify(reference ?? null))
     return;
+
   pushDiff(
     diffs,
     actualNode,
@@ -564,8 +561,8 @@ function compareRadius(
   );
 }
 
-function formatRadius(value: DSRadii | undefined): string {
-  if (value === undefined) return '—';
+function formatRadius(value: DSRadii | null): string {
+  if (value === null) return '—';
   if (typeof value === 'number') return String(value);
   return `(${value.topLeft}, ${value.topRight}, ${value.bottomRight}, ${value.bottomLeft})`;
 }
@@ -578,27 +575,27 @@ function compareOpacity(
   actualToken: string | null,
   referenceToken: string | null,
   diffs: DiffEntry[],
-  issues: string[],
   issueSet: Set<string>,
   strict: boolean,
 ) {
   if (reference === null) return;
+
   if (strict && actual === null) {
     addIssue(
       issueSet,
-      issues,
       `Нет данных для прозрачности в снапшоте для «${path}»`,
     );
     return;
   }
   const normalizedActual = actual === null ? null : Number(actual.toFixed(2));
+
   const normalizedReference =
     reference === null ? null : Number(reference.toFixed(2));
+    
   if (referenceToken) {
     if (strict && !actualToken) {
       addIssue(
         issueSet,
-        issues,
         `Нет данных для token opacity в снапшоте для «${path}»`,
       );
     } else if (actualToken !== referenceToken) {
@@ -621,12 +618,9 @@ function compareOpacity(
 
 function addIssue(
   issueSet: Set<string>,
-  issues: string[],
   message: string,
 ) {
-  if (issueSet.has(message)) return;
   issueSet.add(message);
-  issues.push(message);
 }
 
 function pushDiff(

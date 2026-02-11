@@ -494,12 +494,6 @@
       <div class="workspace">
         <aside class="sidebar">
           <div id="tabs"></div>
-          <div class="sidebar-footer">
-            <label class="filter-toggle">
-              <span>Только видимые</span>
-              <input type="checkbox" id="filter-visible" checked />
-            </label>
-          </div>
         </aside>
         <main class="main">
           <section id="gpt-card" class="gpt-card hidden" hidden aria-hidden="true">
@@ -682,10 +676,12 @@
         if (headerTitleEl) {
           headerTitleEl.onclick = () => {
             if (!latestSnapshot) return;
+
             const payload = JSON.stringify(latestSnapshot, null, 2);
             const blob = new Blob([payload], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
+
             link.href = url;
             link.download = `normalized-snapshot-${Date.now()}.json`;
             document.body.appendChild(link);
@@ -707,6 +703,7 @@
         function initFilterControls() {
           if (filterVisibleEl instanceof HTMLInputElement) {
             filters.visibleOnly = filterVisibleEl.checked;
+            
             filterVisibleEl.addEventListener('change', () => {
               filters.visibleOnly = filterVisibleEl.checked;
               renderList();
@@ -875,10 +872,8 @@
          */
         function prepareChangeDiffs(item) {
           const rawDiffs = Array.isArray(item.diffs) ? item.diffs : [];
-          const visibleDiffs = filters.visibleOnly
-            ? rawDiffs.filter((diff) => diff.visible !== false)
-            : rawDiffs.slice();
-          return dedupeDiffs(visibleDiffs);
+
+          return dedupeDiffs(rawDiffs);
         }
 
         const TRIVIAL_SEGMENT_TEXTS = new Set(['—', '–', '-', 'ok']);
@@ -918,7 +913,7 @@
                     ? [line.segments]
                     : [];
               const contentLine = createContentLine({
-                visible: line.visible ?? isItemVisible(item),
+                visible: true,
                 showIcon:
                   typeof line.showIcon === 'boolean'
                     ? line.showIcon
@@ -1220,7 +1215,7 @@
         }
 
         function buildChangeCardLines(item) {
-          const diffs = prepareChangeDiffs(item);
+          const { diffs } = item;
           if (!diffs.length) {
             return [];
           }
@@ -1343,26 +1338,6 @@
           tryUpdateGptStatus(message || 'Ошибка при запросе');
         }
 
-        /**
-         * Применяет текущие фильтры (видимость + компонентность) к списку аудит-элементов.
-         * Используется для табов, которые рендерят список узлов.
-         */
-        function isItemVisible(item) {
-          if (!item) return false;
-          if (item.visible === false) return false;
-          if (!Array.isArray(item.pathSegments)) return true;
-          return item.pathSegments.every((segment) => {
-            if (
-              segment &&
-              typeof segment === 'object' &&
-              Object.prototype.hasOwnProperty.call(segment, 'visible')
-            ) {
-              return segment.visible !== false;
-            }
-            return true;
-          });
-        }
-
         function getItemLibraryName(item) {
           if (item.librarySource) {
             return item.librarySource;
@@ -1413,6 +1388,7 @@
           }
 
           if (msg.type === 'scan-started') {
+            listContainer.innerHTML = '';
             setScanningState(true);
             snapshotReady = false;
             latestSnapshot = null;
