@@ -188,6 +188,7 @@ async function runAudit() {
     const checkState = createCheckState()
 
     const referenceStructureCache = new Map<string, DSStructureNode[] | null>();
+    const checkedComponentNodesList = new Set<string>();
 
     const customStyleReasonOptions: CustomStyleCollectionOptions = {
       tokenLabelMap: tokenLabelMap ?? new Map(),
@@ -198,7 +199,7 @@ async function runAudit() {
       tokenColorMap: tokenColorMap ?? new Map(),
     };
 
-    await collectTargets(selection, checkState, referenceStructureCache, customStyleReasonOptions, textNodeOptions );
+    await collectTargets(selection, checkState, referenceStructureCache, customStyleReasonOptions, textNodeOptions, checkedComponentNodesList );
     
     if (checkState.totalItems === 0) {
       const message = 'Компоненты или инстансы в выделении не найдены.';
@@ -294,34 +295,35 @@ async function collectTargets(
   checkState: CheckState, 
   referenceStructureCache: Map<string, DSStructureNode[] | null>,
   customStyleReasonOptions: CustomStyleCollectionOptions,
-  textOptions: TextNodeCollectionOptions
+  textOptions: TextNodeCollectionOptions,
+  checkedComponentNodesList: Set<string>,
 ) {
   const visit = async (node: SceneNode): Promise<void> => {
       if (!node.visible) {
         return;
       }
 
-      if (node.type === 'INSTANCE' || node.type === 'COMPONENT') {
-        const item = await classifyNode(node, referenceStructureCache);
+      const nodeIsComponent = node.type === 'INSTANCE' || node.type === 'COMPONENT'
 
-        if (item) {
-          checkState.totalItems++;
+      if (nodeIsComponent) {
+        const item = await classifyNode(node, referenceStructureCache, checkedComponentNodesList);
 
-          if (item.relevance) {
-            checkState.relevanceBuckets[item.relevance].push(item);
-          }
+        checkState.totalItems++;
 
-          if (item.themeStatus) {
-            checkState.themeBuckets[item.themeStatus].push(item);
-          }
+        if (item.relevance) {
+          checkState.relevanceBuckets[item.relevance].push(item);
+        }
 
-          if (item.isLocal) {
-            checkState.localLibraryItems.push(item);
-          }
+        if (item.themeStatus) {
+          checkState.themeBuckets[item.themeStatus].push(item);
+        }
 
-          if (isPresetCandidate(item)) {
-            checkState.presetItems.push(item);
-          }
+        if (item.isLocal) {
+          checkState.localLibraryItems.push(item);
+        }
+
+        if (isPresetCandidate(item)) {
+          checkState.presetItems.push(item);
         }
       }
 
@@ -375,7 +377,8 @@ async function collectTargets(
 async function classifyNode(
   node: SceneNode,
   referenceStructureCache: Map<string, DSStructureNode[] | null>,
-): Promise<AuditItem | null> {
+  checkedComponentNodesList: Set<string>
+): Promise<AuditItem> {
   const nodeSegments = buildNodeSegments(node);
 
   const pathSegments =
@@ -433,13 +436,13 @@ async function classifyNode(
       referenceStructure = null;
     }
   }
-  const needsDiff = Boolean(referenceStructure);
+  const needsDiff = Boolean(referenceStructure) && !checkedComponentNodesList.has(node.id);
   const instanceHasOverrides =
     node.type === 'INSTANCE' && hasInstanceOverrides(node as InstanceNode);
   const shouldDiff =
     needsDiff && (ref?.status !== 'current' || instanceHasOverrides);
   const actualStructure =
-    shouldDiff && referenceStructure ? await snapshotTree(node) : null;
+    shouldDiff && referenceStructure ? await snapshotTree(node, checkedComponentNodesList) : null;
   const alignedActualStructure =
     referenceStructure && actualStructure
       ? alignStructurePaths(actualStructure, referenceStructure)
@@ -466,6 +469,7 @@ async function classifyNode(
   }
 
   const diffs = diffResult.diffs;
+
   if (comparisonIssues.length) {
     console.warn('[Nemesis] comparison issues', {
       nodeId: node.id,

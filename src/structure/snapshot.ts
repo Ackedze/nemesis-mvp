@@ -26,7 +26,7 @@ function makePath(parent: string, name: string): string {
  * Рекурсивно перебирает дерево узла и формирует плоский список DSStructureNode
  * с корректным учётом effective visibility, layout, fill/stroke и прочих метаданных.
  */
-export async function snapshotTree(root: SceneNode): Promise<DSStructureNode[]> {
+export async function snapshotTree(root: SceneNode, checkedComponentNodesList: Set<string>): Promise<DSStructureNode[]> {
   const list: DSStructureNode[] = [];
   let nextId = 1;
 
@@ -39,6 +39,8 @@ export async function snapshotTree(root: SceneNode): Promise<DSStructureNode[]> 
     if (!node.visible) {
       return
     }
+
+    checkedComponentNodesList.add(node.id);
 
     const id = nextId++;
     const nodeVisible = getNodeSelfVisible(node);
