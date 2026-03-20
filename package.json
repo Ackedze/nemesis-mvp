@@ -1,5 +1,5 @@
 {
-  "name": "nemesis-mvp",
+  "name": "apollo-mvp",
   "version": "0.1.0",
   "scripts": {
     "build": "node build.js && node scripts/exportComponentTree.js",

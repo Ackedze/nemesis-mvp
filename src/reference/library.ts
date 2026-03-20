@@ -86,7 +86,7 @@ async function ensureCatalogSourceList(): Promise<ReferenceCatalogSource[]> {
 
     const payload = JSON.parse(response);
 
-    console.log('[Nemesis] reference sources list loaded', {
+    console.log('[Apollo] reference sources list loaded', {
       url: referenceCatalogListUrl,
       baseUrl: payload?.baseUrl ?? '',
       count: payload?.catalogs?.length ?? 0,
@@ -113,7 +113,7 @@ async function fetchCatalogModule(
   try {
     const response = await requestCatalogSource(source.url);
 
-    console.log('[Nemesis] catalog fetched', {
+    console.log('[Apollo] catalog fetched', {
       fileName: source.fileName,
       url: source.url,
       bytes: response.length,
@@ -186,7 +186,7 @@ async function loadTokenCatalogs(
     try {
       const raw = await requestCatalogSource(source.url);
 
-      console.log('[Nemesis] token catalog fetched', {
+      console.log('[Apollo] token catalog fetched', {
         fileName: source.fileName,
         url: source.url,
         bytes: raw.length,
@@ -220,7 +220,7 @@ async function loadStyleCatalogs(
     try {
       const raw = await requestCatalogSource(source.url);
 
-      console.log('[Nemesis] style catalog fetched', {
+      console.log('[Apollo] style catalog fetched', {
         fileName: source.fileName,
         url: source.url,
         bytes: raw.length,
@@ -847,7 +847,7 @@ function hydrateCatalogs(modules: AthenaCatalog[]) {
   const validationWarnings: string[] = [];
 
   for (const module of catalogs) {
-    console.log('[Nemesis] catalog loaded summary', {
+    console.log('[Apollo] catalog loaded summary', {
       fileName: module.meta?.fileName ?? 'unknown',
       componentCount: module.components?.length ?? 0,
     });
@@ -879,7 +879,7 @@ function hydrateCatalogs(modules: AthenaCatalog[]) {
       );
     }
   }
-  console.log('[Nemesis] catalog merge summary', {
+  console.log('[Apollo] catalog merge summary', {
     catalogCount: catalogs.length,
     componentCount: totalComponents,
     uniqueKeys: uniqueKeys.size,
@@ -887,12 +887,12 @@ function hydrateCatalogs(modules: AthenaCatalog[]) {
 
   if (validationWarnings.length) {
     for (const warning of validationWarnings.slice(0, 50)) {
-      console.warn(`[Nemesis::catalog] ${warning}`);
+      console.warn(`[Apollo::catalog] ${warning}`);
     }
 
     if (validationWarnings.length > 50) {
       console.warn(
-        `[Nemesis::catalog] Дополнительно ${validationWarnings.length - 50} предупреждений`,
+        `[Apollo::catalog] Дополнительно ${validationWarnings.length - 50} предупреждений`,
       );
     }
   }
@@ -931,7 +931,7 @@ function validateCatalogComponent(
 }
 
 function logCatalogEvent(source: ReferenceCatalogSource, message: string) {
-  console.warn('[Nemesis] catalog event', {
+  console.warn('[Apollo] catalog event', {
     fileName: source.fileName,
     url: source.url,
     message,
@@ -953,7 +953,7 @@ export function reportMissingReference(name: string, key: string | null) {
 
   const message = `Не найден компонент с ключом ${key} (${name})`;
 
-  console.warn(`[Nemesis::catalog] ${message}`);
+  console.warn(`[Apollo::catalog] ${message}`);
 
   try {
     figma.ui.postMessage({
@@ -981,8 +981,8 @@ async function requestCatalogSource(url: string): Promise<string> {
 }
 
 export const primaryCatalog: LibraryCatalog = {
-  id: 'nemesis-catalog',
-  name: 'Nemesis Catalog',
+  id: 'apollo-catalog',
+  name: 'Apollo Catalog',
   components: [],
 };
 

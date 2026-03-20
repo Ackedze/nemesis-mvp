@@ -45,7 +45,7 @@ function readLocalIfExists() {
       try {
         const raw = fs.readFileSync(p, 'utf8');
         const parsed = JSON.parse(raw);
-        console.log(`[Nemesis] Using local reference sources: ${p}`);
+        console.log(`[Apollo] Using local reference sources: ${p}`);
         return parsed;
       } catch (e) {
         // continue
@@ -67,7 +67,7 @@ function fetchJsonViaHttps(urlString) {
         protocol: url.protocol,
         headers: {
           Accept: 'application/json',
-          'User-Agent': 'Nemesis-mvp/prepareReferences',
+          'User-Agent': 'Apollo/prepareReferences',
         },
       },
       (res) => {
@@ -107,7 +107,7 @@ async function fetchWithRetries(url, retries = 2) {
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
       if (attempt > 0) {
-        console.log(`[Nemesis] Retry ${attempt}/${retries}…`);
+        console.log(`[Apollo] Retry ${attempt}/${retries}…`);
       }
       return await fetchJsonViaHttps(url);
     } catch (e) {
@@ -137,7 +137,7 @@ async function main() {
     // fallback to local if remote failed
     if (local) {
       console.warn(
-        `[Nemesis] Remote fetch failed, falling back to local cache. Reason: ${e.message}`,
+        `[Apollo] Remote fetch failed, falling back to local cache. Reason: ${e.message}`,
       );
       writeReferenceFiles(local);
       return;
@@ -147,6 +147,6 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error(`[Nemesis] Unable to load reference catalog list:`, error);
+  console.error(`[Apollo] Unable to load reference catalog list:`, error);
   process.exit(1);
 });

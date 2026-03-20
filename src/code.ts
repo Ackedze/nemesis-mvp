@@ -130,7 +130,7 @@ async function runAudit() {
     cancelRequested = false;
 
     console.log(
-      `[Nemesis] audit total: ${(getTimestamp() - auditStart).toFixed(
+      `[Apollo] audit total: ${(getTimestamp() - auditStart).toFixed(
         1,
       )} ms (${status})`,
     );
@@ -148,7 +148,7 @@ async function runAudit() {
 
   try {
     if (!areReferenceCatalogsReady()) {
-      figma.notify('Подключаемся к библиотекам Nemesis…');
+      figma.notify('Подключаемся к библиотекам Apollo…');
     }
 
     await ensureReferenceCatalogsLoaded();
@@ -471,7 +471,7 @@ async function classifyNode(
   const diffs = diffResult.diffs;
 
   if (comparisonIssues.length) {
-    console.warn('[Nemesis] comparison issues', {
+    console.warn('[Apollo] comparison issues', {
       nodeId: node.id,
       name: node.name,
       issues: comparisonIssues.slice(0, 8),
@@ -826,7 +826,7 @@ async function ensureTokenLabelMapLoaded(): Promise<void> {
       tokenLabelMap = map;
       tokenColorMap = colorMap;
     } catch (error) {
-      console.warn('[Nemesis] failed to load token catalogs', error);
+      console.warn('[Apollo] failed to load token catalogs', error);
       tokenLabelMap = new Map();
       tokenColorMap = new Map();
     } finally {
@@ -866,7 +866,7 @@ async function ensureStyleLabelMapLoaded(): Promise<void> {
       }
       styleLabelMap = map;
     } catch (error) {
-      console.warn('[Nemesis] failed to load style catalogs', error);
+      console.warn('[Apollo] failed to load style catalogs', error);
       styleLabelMap = new Map();
     } finally {
       styleLabelLoadPromise = null;

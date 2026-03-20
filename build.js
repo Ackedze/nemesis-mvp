@@ -22,7 +22,7 @@ const common = {
 async function buildOnce() {
   await esbuild.build(common);
   copyHtml();
-  console.log('✅ Nemesis build done');
+  console.log('✅ Apollo build done');
 }
 
 function copyHtml() {
@@ -36,7 +36,7 @@ if (isWatch) {
     const ctx = await esbuild.context(common);
     await ctx.watch();
     copyHtml();
-    console.log('👀 Nemesis watching');
+    console.log('👀 Apollo watching');
   })();
 } else {
   buildOnce();

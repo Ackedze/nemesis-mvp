@@ -1,4 +1,4 @@
-# Аудит Nemesis MVP
+# Аудит Apollo
 
 ## Обзор
 - Проверены ключевые модули плагина (`src/code.ts`, `src/ui.html`), сборка (`build.js`, `scripts/`) и конфигурация зависимостей (`package.json`).
